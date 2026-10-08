@@ -2,7 +2,7 @@
     <div class="container">
         <a class="navbar-brand" href="<?php echo SITE_URL; ?>/index.php">
             <span class="brand-icon"><i class="fas fa-graduation-cap"></i></span>
-            <span class="brand-text">SIPWAY<span>online</span></span>
+            <span class="brand-text">SIPWAY<span>online school</span></span>
         </a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
             <span class="navbar-toggler-icon"></span>
