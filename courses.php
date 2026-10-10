@@ -14,13 +14,13 @@ $stmt->execute($params);
 $courses = $stmt->fetchAll();
 $categories = $pdo->query("SELECT * FROM categories ORDER BY sort_order")->fetchAll();
 ?>
-<section class="page-header"><div class="container position-relative"><h1 data-aos="fade-up">Our Courses</h1>
+<section class="page-header"><div class="container position-relative"><h1 data-aos="fade-up">Our Classes</h1>
 <nav aria-label="breadcrumb" data-aos="fade-up" data-aos-delay="80"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="index.php">Home</a></li><li class="breadcrumb-item active">Courses</li></ol></nav></div></section>
 <section class="section"><div class="container"><div class="row g-4">
 <div class="col-lg-3"><div class="lesson-sidebar" data-aos="fade-right">
 <h5><i class="fas fa-filter me-2"></i>Categories</h5>
 <ul class="lesson-list">
-<li><a href="courses.php" class="<?php echo !$cat_slug?'active':''; ?>"><i class="fas fa-th"></i> All Courses</a></li>
+<li><a href="courses.php" class="<?php echo !$cat_slug?'active':''; ?>"><i class="fas fa-th"></i> All Classes</a></li>
 <?php foreach ($categories as $cat): ?>
 <li><a href="courses.php?cat=<?php echo e($cat['slug']); ?>" class="<?php echo $cat_slug===$cat['slug']?'active':''; ?>"><i class="<?php echo e($cat['icon']); ?>"></i> <?php echo e($cat['name']); ?></a></li>
 <?php endforeach; ?>
@@ -31,10 +31,10 @@ $categories = $pdo->query("SELECT * FROM categories ORDER BY sort_order")->fetch
 <div class="input-group"><input type="text" name="q" class="form-control form-control-sm" placeholder="Search..." value="<?php echo e($search); ?>"><button class="btn btn-primary btn-sm" type="submit"><i class="fas fa-search"></i></button></div>
 </form></div></div>
 <div class="col-lg-9">
-<p class="text-muted mb-3" data-aos="fade-up"><?php echo count($courses); ?> course(s) found</p>
+<p class="text-muted mb-3" data-aos="fade-up"><?php echo count($courses); ?> classe(s) found</p>
 <div class="row g-4">
 <?php if (empty($courses)): ?>
-<div class="col-12 text-center py-5"><i class="fas fa-book-open fa-3x text-muted mb-3"></i><h4>No courses found</h4><a href="courses.php" class="btn btn-primary">View All</a></div>
+<div class="col-12 text-center py-5"><i class="fas fa-book-open fa-3x text-muted mb-3"></i><h4>No classes found</h4><a href="courses.php" class="btn btn-primary">View All</a></div>
 <?php else: foreach ($courses as $i => $c): ?>
 <div class="col-md-6" data-aos="fade-up" data-aos-delay="<?php echo ($i%4)*70; ?>">
 <div class="course-card">

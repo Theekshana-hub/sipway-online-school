@@ -10,7 +10,7 @@
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav ms-auto align-items-lg-center">
                 <li class="nav-item"><a class="nav-link <?php echo $current_page=='index'?'active':''; ?>" href="<?php echo SITE_URL; ?>/index.php">Home</a></li>
-                <li class="nav-item"><a class="nav-link <?php echo $current_page=='courses'||$current_page=='course-details'?'active':''; ?>" href="<?php echo SITE_URL; ?>/courses.php">Courses</a></li>
+                <li class="nav-item"><a class="nav-link <?php echo $current_page=='courses'||$current_page=='course-details'?'active':''; ?>" href="<?php echo SITE_URL; ?>/courses.php">Classes</a></li>
                 <li class="nav-item"><a class="nav-link <?php echo $current_page=='teachers'?'active':''; ?>" href="<?php echo SITE_URL; ?>/teachers.php">Teachers</a></li>
                 <li class="nav-item"><a class="nav-link <?php echo $current_page=='about'?'active':''; ?>" href="<?php echo SITE_URL; ?>/about.php">About</a></li>
                 <li class="nav-item"><a class="nav-link <?php echo $current_page=='contact'?'active':''; ?>" href="<?php echo SITE_URL; ?>/contact.php">Contact</a></li>
