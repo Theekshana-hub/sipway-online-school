@@ -2,6 +2,7 @@
 $page_title = 'Courses';
 require_once 'includes/header.php';
 $pdo = getDB();
+if (session_status() === PHP_SESSION_NONE) session_start();
 $cat_slug = $_GET['cat'] ?? '';
 $search = trim($_GET['q'] ?? '');
 
@@ -27,6 +28,14 @@ $sql .= " ORDER BY c.is_featured DESC, c.title";
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $courses = $stmt->fetchAll();
+
+// ★ Login වෙලා ඉන්න user ගෙවලා ඉවර කරපු courses
+$paidCourseIds = [];
+if (!empty($_SESSION['user_id'])) {
+    $ps = $pdo->prepare("SELECT course_id FROM course_orders WHERE user_id = ? AND status = 'paid'");
+    $ps->execute([$_SESSION['user_id']]);
+    $paidCourseIds = array_map('intval', $ps->fetchAll(PDO::FETCH_COLUMN));
+}
 
 // Categories tree
 $allCats = $pdo->query("SELECT * FROM categories ORDER BY sort_order, name")->fetchAll();
@@ -58,8 +67,6 @@ foreach ($topCats as $t) {
     flex-direction:column;
     overflow:hidden;
 }
-
-/* Image box: හැම card එකම එකම size */
 .cg-grid .course-thumb.cg-thumb{
     position:relative;
     width:100%;
@@ -70,7 +77,6 @@ foreach ($topCats as $t) {
     align-items:center;
     justify-content:center;
 }
-/* Blur කරපු background (හිස් ඉඩ පිරවීමට) */
 .cg-thumb .cg-bg{
     position:absolute;
     inset:-20px;
@@ -79,7 +85,6 @@ foreach ($topCats as $t) {
     filter:blur(18px) brightness(.92);
     transform:scale(1.1);
 }
-/* Image එක crop නොවී full එකම */
 .cg-thumb .cg-img{
     position:relative;
     z-index:1;
@@ -91,7 +96,6 @@ foreach ($topCats as $t) {
 .cg-thumb .course-badge,
 .cg-thumb .course-level{ z-index:2; }
 
-/* Body: price එක හැමවෙලේම පල්ලෙහාම */
 .cg-grid .course-body{
     flex:1;
     display:flex;
@@ -99,13 +103,16 @@ foreach ($topCats as $t) {
 }
 .cg-grid .course-meta{ margin-top:auto; }
 
-/* Category label එක එක පේළියකට */
 .course-category{
     white-space:nowrap;
     overflow:hidden;
     text-overflow:ellipsis;
     max-width:100%;
 }
+
+/* ★ Enroll buttons */
+.cg-actions{ display:flex; gap:8px; margin-top:12px; }
+.cg-actions .btn{ flex:1; font-size:.85rem; padding:.45rem .5rem; }
 
 @media (max-width:575px){
     .cg-grid{ grid-template-columns:1fr; }
@@ -141,6 +148,7 @@ foreach ($topCats as $t) {
 <div class="cg-grid">
 <?php foreach ($courses as $i => $c):
     $cImg = imageUrl('courses', $c['thumbnail'] ?? null);
+    $isPaid = in_array((int)$c['id'], $paidCourseIds, true);
 ?>
 <div class="cg-item" data-aos="fade-up" data-aos-delay="<?php echo ($i%3)*70; ?>">
 <div class="course-card">
@@ -164,6 +172,19 @@ foreach ($topCats as $t) {
 <?php if ($c['title_si']): ?><p class="small text-muted mb-1"><?php echo e($c['title_si']); ?></p><?php endif; ?>
 <p class="course-desc"><?php echo e($c['short_desc']); ?></p>
 <div class="course-meta"><span><i class="far fa-clock"></i> <?php echo e($c['duration']); ?></span><span class="course-price"><?php echo formatPrice($c['price']); ?></span></div>
+
+<!-- ★ Enroll / Pay buttons -->
+<div class="cg-actions">
+    <a href="course-details.php?slug=<?php echo e($c['slug']); ?>" class="btn btn-outline-secondary">Details</a>
+    <?php if ($isPaid): ?>
+        <span class="btn btn-success disabled"><i class="fas fa-check me-1"></i>Enrolled</span>
+    <?php else: ?>
+        <a href="checkout.php?slug=<?php echo e($c['slug']); ?>" class="btn btn-primary">
+            <i class="fas fa-credit-card me-1"></i><?php echo ((float)$c['price'] > 0) ? 'Enroll Now' : 'Join Free'; ?>
+        </a>
+    <?php endif; ?>
+</div>
+
 </div></div></div>
 <?php endforeach; ?>
 </div>
