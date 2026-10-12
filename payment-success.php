@@ -29,6 +29,9 @@ if ($o && $o['status'] === 'pending' && !empty($o['paycorp_reqid'])) {
         $o = $st->fetch();
     } catch (Exception $ex) { error_log('[Paycorp recheck] ' . $ex->getMessage()); }
 }
+
+// Paid නම් enrollment එක තියෙනවාද බලලා නැත්නම් දානවා
+if ($o && $o['status'] === 'paid') enrollStudent($pdo, $o['user_id'], $o['course_id']);
 ?>
 <section class="page-header"><div class="container"><h1>Payment Status</h1></div></section>
 <section class="section"><div class="container"><div class="row justify-content-center"><div class="col-lg-6">

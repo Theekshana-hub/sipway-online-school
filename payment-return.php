@@ -30,6 +30,7 @@ if ($order['status'] === 'pending') {
         if ($code === '00' && $paidC === $expect && $curr === $order['currency']) {
             $pdo->prepare("UPDATE course_orders SET status='paid', paid_at=NOW(), txn_reference=?, response_code=? WHERE id=? AND status='pending'")
                 ->execute([$r['txnReference'] ?? null, $code, $order['id']]);
+            enrollStudent($pdo, $order['user_id'], $order['course_id']);
         } else {
             $pdo->prepare("UPDATE course_orders SET status='failed', response_code=? WHERE id=? AND status='pending'")
                 ->execute([$code ?: 'ERR', $order['id']]);

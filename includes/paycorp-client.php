@@ -78,3 +78,40 @@ function paycorpComplete($reqid) {
         'reqid'    => $reqid,
     ]);
 }
+
+/** ගෙවීම සාර්ථක වුණාම student ව course එකට enroll කරනවා (දැනටමත් ඉන්නවා නම් නැවත දාන්නේ නෑ) */
+function enrollStudent(PDO $pdo, $userId, $courseId) {
+    try {
+        $c = $pdo->prepare("SELECT 1 FROM enrollments WHERE user_id=? AND course_id=? LIMIT 1");
+        $c->execute([$userId, $courseId]);
+        if ($c->fetch()) return true;
+
+        // enrollments.status column එක තියෙනවා නම් ඒකට ගැලපෙන value එකක් තෝරනවා
+        $cols = ['user_id', 'course_id', 'progress', 'enrolled_at'];
+        $vals = [$userId, $courseId, 0, date('Y-m-d H:i:s')];
+
+        $col = $pdo->query("SHOW COLUMNS FROM enrollments LIKE 'status'")->fetch();
+        if ($col) {
+            $val = 'active';
+            if (stripos($col['Type'], 'enum') === 0 && preg_match_all("/'([^']*)'/", $col['Type'], $m)) {
+                $opts = $m[1];
+                $val = null;
+                foreach (['active', 'enrolled', 'approved', 'paid', 'confirmed'] as $pref) {
+                    if (in_array($pref, $opts, true)) { $val = $pref; break; }
+                }
+                if ($val === null) $val = $opts[0];
+            } elseif (preg_match('/int/i', $col['Type'])) {
+                $val = 1;
+            }
+            $cols[] = 'status';
+            $vals[] = $val;
+        }
+
+        $sql = "INSERT INTO enrollments (" . implode(',', $cols) . ") VALUES (" . implode(',', array_fill(0, count($cols), '?')) . ")";
+        $pdo->prepare($sql)->execute($vals);
+        return true;
+    } catch (Exception $ex) {
+        error_log('[enrollStudent] ' . $ex->getMessage());
+        return false;
+    }
+}
