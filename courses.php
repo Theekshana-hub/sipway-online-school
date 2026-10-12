@@ -44,6 +44,73 @@ foreach ($topCats as $t) {
     }
 }
 ?>
+<style>
+/* ===== Courses grid ===== */
+.cg-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(250px,1fr));
+    gap:24px;
+}
+.cg-grid .cg-item{ min-width:0; }
+.cg-grid .course-card{
+    height:100%;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+}
+
+/* Image box: හැම card එකම එකම size */
+.cg-grid .course-thumb.cg-thumb{
+    position:relative;
+    width:100%;
+    height:auto !important;
+    aspect-ratio:4 / 3;
+    overflow:hidden;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+}
+/* Blur කරපු background (හිස් ඉඩ පිරවීමට) */
+.cg-thumb .cg-bg{
+    position:absolute;
+    inset:-20px;
+    background-size:cover;
+    background-position:center;
+    filter:blur(18px) brightness(.92);
+    transform:scale(1.1);
+}
+/* Image එක crop නොවී full එකම */
+.cg-thumb .cg-img{
+    position:relative;
+    z-index:1;
+    width:100%;
+    height:100%;
+    object-fit:contain;
+    display:block;
+}
+.cg-thumb .course-badge,
+.cg-thumb .course-level{ z-index:2; }
+
+/* Body: price එක හැමවෙලේම පල්ලෙහාම */
+.cg-grid .course-body{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+}
+.cg-grid .course-meta{ margin-top:auto; }
+
+/* Category label එක එක පේළියකට */
+.course-category{
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    max-width:100%;
+}
+
+@media (max-width:575px){
+    .cg-grid{ grid-template-columns:1fr; }
+}
+</style>
 <section class="page-header"><div class="container position-relative"><h1 data-aos="fade-up">Our Classes</h1>
 <nav aria-label="breadcrumb" data-aos="fade-up" data-aos-delay="80"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="index.php">Home</a></li><li class="breadcrumb-item active">Courses</li></ol></nav></div></section>
 <section class="section"><div class="container"><div class="row g-4">
@@ -68,25 +135,38 @@ foreach ($topCats as $t) {
 </form></div></div>
 <div class="col-lg-9">
 <p class="text-muted mb-3" data-aos="fade-up"><?php echo count($courses); ?> classe(s) found</p>
-<div class="row g-4">
 <?php if (empty($courses)): ?>
-<div class="col-12 text-center py-5"><i class="fas fa-book-open fa-3x text-muted mb-3"></i><h4>No classes found</h4><a href="courses.php" class="btn btn-primary">View All</a></div>
-<?php else: foreach ($courses as $i => $c): ?>
-<div class="col-md-6" data-aos="fade-up" data-aos-delay="<?php echo ($i%4)*70; ?>">
+<div class="text-center py-5"><i class="fas fa-book-open fa-3x text-muted mb-3"></i><h4>No classes found</h4><a href="courses.php" class="btn btn-primary">View All</a></div>
+<?php else: ?>
+<div class="cg-grid">
+<?php foreach ($courses as $i => $c):
+    $cImg = imageUrl('courses', $c['thumbnail'] ?? null);
+?>
+<div class="cg-item" data-aos="fade-up" data-aos-delay="<?php echo ($i%3)*70; ?>">
 <div class="course-card">
-<?php $cImg = imageUrl('courses', $c['thumbnail']??null); ?>
-<div class="course-thumb" style="<?php echo $cImg ? 'background:url('.e($cImg).') center/cover;' : 'background:linear-gradient(135deg,'.e($c['cat_color']??'#1A1A1A').',#E30613)'; ?>">
-<?php if (!$cImg): ?><i class="<?php echo e($c['cat_icon']??'fas fa-book'); ?>"></i><?php endif; ?>
-<?php if ($c['is_featured']): ?><span class="course-badge">Featured</span><?php endif; ?>
-<span class="course-level"><?php echo e($c['level']); ?></span>
+<?php if ($cImg): ?>
+<div class="course-thumb cg-thumb">
+    <div class="cg-bg" style="background-image:url('<?php echo e($cImg); ?>')"></div>
+    <img class="cg-img" src="<?php echo e($cImg); ?>" alt="<?php echo e($c['title']); ?>" loading="lazy">
+    <?php if ($c['is_featured']): ?><span class="course-badge">Featured</span><?php endif; ?>
+    <span class="course-level"><?php echo e($c['level']); ?></span>
 </div>
+<?php else: ?>
+<div class="course-thumb cg-thumb" style="background:linear-gradient(135deg,<?php echo e($c['cat_color'] ?? '#1A1A1A'); ?>,#E30613)">
+    <i class="<?php echo e($c['cat_icon'] ?? 'fas fa-book'); ?>" style="position:relative;z-index:1"></i>
+    <?php if ($c['is_featured']): ?><span class="course-badge">Featured</span><?php endif; ?>
+    <span class="course-level"><?php echo e($c['level']); ?></span>
+</div>
+<?php endif; ?>
 <div class="course-body">
-<div class="course-category"><?php echo e(($c['parent_name'] ? $c['parent_name'].' › ' : '') . ($c['cat_name']??'')); ?></div>
+<div class="course-category"><?php echo e($c['cat_name'] ?? ''); ?></div>
 <h3 class="course-title"><a href="course-details.php?slug=<?php echo e($c['slug']); ?>" style="color:inherit"><?php echo e($c['title']); ?></a></h3>
 <?php if ($c['title_si']): ?><p class="small text-muted mb-1"><?php echo e($c['title_si']); ?></p><?php endif; ?>
 <p class="course-desc"><?php echo e($c['short_desc']); ?></p>
 <div class="course-meta"><span><i class="far fa-clock"></i> <?php echo e($c['duration']); ?></span><span class="course-price"><?php echo formatPrice($c['price']); ?></span></div>
 </div></div></div>
-<?php endforeach; endif; ?>
-</div></div></div></div></section>
+<?php endforeach; ?>
+</div>
+<?php endif; ?>
+</div></div></div></section>
 <?php require_once 'includes/footer.php'; ?>
