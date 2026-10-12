@@ -18,4 +18,4 @@ if (!defined('PAYCORP_DEBUG')) define('PAYCORP_DEBUG', true);
 
 // WAMP එකේ "SSL certificate problem" ආවොත්: cacert.pem download කරලා path එක මෙතන දාන්න
 // උදා: 'C:/wamp64/cacert.pem'   (නැත්නම් '' ලෙස තියන්න)
-if (!defined('PAYCORP_CA_BUNDLE')) define('PAYCORP_CA_BUNDLE', '');
+   if (!defined('PAYCORP_CA_BUNDLE')) define('PAYCORP_CA_BUNDLE', 'C:/wamp64/cacert.pem');

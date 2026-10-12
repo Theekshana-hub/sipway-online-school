@@ -1,8 +1,13 @@
 <?php
 // Paycorp payment page එකෙන් user ආපහු එන තැන. HTML output නෑ, verify කරලා redirect විතරයි.
-// ⚠ header.php මෙතන include කරන්න එපා (output යනවා). getDB() තියෙන file එක විතරක් include කරන්න.
-require_once 'includes/config.php';          // <-- getDB() තියෙන file එක. නම වෙනස් නම් හදන්න
+// header.php එක (getDB, session, helpers load කරන) buffer කරලා, HTML output එක ඉවත් කරනවා.
+// ඒ නිසා config file එකේ නම දැනගන්න ඕන නෑ.
+ob_start();
+$page_title = 'Payment';
+require_once 'includes/header.php';
+ob_end_clean();
 require_once 'includes/paycorp-client.php';
+if (session_status() === PHP_SESSION_NONE) session_start();
 
 $reqid = trim($_GET['reqid'] ?? '');
 if ($reqid === '') { header('Location: courses.php'); exit; }
