@@ -13,11 +13,27 @@ $lessons = $pdo->prepare("SELECT * FROM lessons WHERE course_id=? AND is_publish
 $lessons->execute([$course['id']]);
 $lessons = $lessons->fetchAll();
 
-// Enroll
+$isFree = (float)$course['price'] <= 0;
+
+// ★ Student දැනටමත් enroll වෙලාද (enrollments හෝ paid order එකක්)
+$isEnrolled = false;
+if (isStudent()) {
+    $chk = $pdo->prepare("SELECT 1 FROM enrollments WHERE user_id=? AND course_id=? LIMIT 1");
+    $chk->execute([$_SESSION['user_id'], $course['id']]);
+    $isEnrolled = (bool)$chk->fetch();
+    if (!$isEnrolled) {
+        $chk = $pdo->prepare("SELECT 1 FROM course_orders WHERE user_id=? AND course_id=? AND status='paid' LIMIT 1");
+        $chk->execute([$_SESSION['user_id'], $course['id']]);
+        $isEnrolled = (bool)$chk->fetch();
+    }
+}
+
+// ★ Enroll: FREE courses වලට විතරයි direct enroll. Paid ඒවා checkout (ගෙවීම) හරහා විතරයි.
 if (isset($_GET['enroll']) && isStudent()) {
-    $check = $pdo->prepare("SELECT id FROM enrollments WHERE user_id=? AND course_id=?");
-    $check->execute([$_SESSION['user_id'], $course['id']]);
-    if (!$check->fetch()) {
+    if (!$isFree && !$isEnrolled) {
+        redirect('checkout.php?slug=' . urlencode($slug));
+    }
+    if ($isFree && !$isEnrolled) {
         $pdo->prepare("INSERT INTO enrollments (user_id, course_id) VALUES (?,?)")->execute([$_SESSION['user_id'], $course['id']]);
     }
     redirect('student-dashboard.php');
@@ -43,9 +59,15 @@ require_once 'includes/header.php';
 <div class="bg-white text-dark rounded-4 p-4 d-inline-block shadow">
 <h3 class="mb-2" style="color:#E30613"><?php echo formatPrice($course['price']); ?></h3>
 <?php if (isStudent()): ?>
-<a href="?slug=<?php echo e($slug); ?>&enroll=1" class="btn btn-primary btn-lg w-100">Enroll Now</a>
+    <?php if ($isEnrolled): ?>
+        <a href="student-dashboard.php" class="btn btn-success btn-lg w-100"><i class="fas fa-check me-1"></i> Enrolled · Go to My Learning</a>
+    <?php elseif ($isFree): ?>
+        <a href="?slug=<?php echo e($slug); ?>&enroll=1" class="btn btn-primary btn-lg w-100">Enroll Free</a>
+    <?php else: ?>
+        <a href="checkout.php?slug=<?php echo e($slug); ?>" class="btn btn-primary btn-lg w-100"><i class="fas fa-credit-card me-1"></i> Enroll Now</a>
+    <?php endif; ?>
 <?php else: ?>
-<a href="login.php?redirect=course-details.php?slug=<?php echo urlencode($slug); ?>" class="btn btn-primary btn-lg w-100">Login to Enroll</a>
+<a href="login.php?redirect=<?php echo urlencode('course-details.php?slug=' . $slug); ?>" class="btn btn-primary btn-lg w-100">Login to Enroll</a>
 <?php endif; ?>
 </div></div></div></div></section>
 <section class="section"><div class="container"><div class="row g-4">
