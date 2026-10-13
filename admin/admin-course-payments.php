@@ -4,7 +4,7 @@ $pdo = getDB();
 
 if (session_status() !== PHP_SESSION_ACTIVE) { session_start(); }
 
-// ---- CSRF token ----
+
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
@@ -16,12 +16,12 @@ $st->execute([$id]);
 $course = $st->fetch();
 if (!$course) redirect('admin-courses.php');
 
-// ---- Filters ----
+
 $status = $_GET['status'] ?? ($_POST['f_status'] ?? '');
 $q = trim($_GET['q'] ?? ($_POST['f_q'] ?? ''));
 $allowed = ['pending','paid','failed','cancelled','chargedback'];
 
-// ---- POST handlers (HTML output යන්න කලින්) ----
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $back = 'admin-course-payments.php?' . http_build_query(['id' => $id, 'status' => $status, 'q' => $q]);
 
@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $action = $_POST['action'] ?? '';
 
-    // ---- Edit a single payment / order ----
+    
     if ($action === 'edit_order') {
         $oid    = (int)($_POST['order_id'] ?? 0);
         $name   = trim($_POST['billing_name'] ?? '');
@@ -51,8 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         try {
-            // course_id check එකෙන් වෙන course එකක order එකක් edit වෙන එක නවතිනවා
-            // status එක paid වුණාම paid_at එක හිස් නම් දැන් වෙලාව දානවා
+           
             $up = $pdo->prepare("UPDATE course_orders
                 SET billing_name = ?, billing_email = ?, billing_phone = ?, status = ?, txn_reference = ?,
                     paid_at = CASE WHEN ? = 'paid' AND paid_at IS NULL THEN NOW() ELSE paid_at END
@@ -65,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect($back);
     }
 
-    // ---- Delete a single payment / order ----
+   
     if ($action === 'delete_order') {
         $oid = (int)($_POST['order_id'] ?? 0);
         try {
@@ -82,13 +81,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect($back);
     }
 
-    // ---- Delete the whole course ----
+  
     if ($action === 'delete_course') {
         $chk = $pdo->prepare("SELECT COUNT(*) FROM course_orders WHERE course_id = ? AND status = 'paid'");
         $chk->execute([$id]);
         $paidCount = (int)$chk->fetchColumn();
 
-        // Paid orders තියෙනවා නම් "DELETE" type කරලා confirm කළ යුතුයි
+       
         if ($paidCount > 0 && ($_POST['confirm_text'] ?? '') !== 'DELETE') {
             $_SESSION['flash'] = ['type' => 'danger', 'msg' => 'This course has paid orders. Deletion was not confirmed.'];
             redirect($back);
@@ -110,7 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     redirect($back);
 }
 
-// ---- Flash message ----
+
 $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
 
@@ -127,12 +126,12 @@ $ps = $pdo->prepare($sql);
 $ps->execute($params);
 $orders = $ps->fetchAll();
 
-// ---- CSV export (HTML output යන්න කලින්) ----
+
 if (isset($_GET['export'])) {
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename="course-' . $id . '-payments-' . date('Ymd') . '.csv"');
     $out = fopen('php://output', 'w');
-    fwrite($out, "\xEF\xBB\xBF"); // Excel UTF-8 BOM
+    fwrite($out, "\xEF\xBB\xBF"); 
     fputcsv($out, ['Order No','Student Name','Email','Phone','Amount','Currency','Status','Txn Reference','Response Code','Terms Accepted','Created','Paid At']);
     foreach ($orders as $o) {
         fputcsv($out, [$o['order_no'],$o['billing_name'],$o['billing_email'],$o['billing_phone'],$o['amount'],$o['currency'],$o['status'],$o['txn_reference'],$o['response_code'],$o['terms_accepted']?'Yes':'No',$o['created_at'],$o['paid_at']]);
@@ -141,7 +140,7 @@ if (isset($_GET['export'])) {
     exit;
 }
 
-// ---- Stats (filter එකට අදාළ නැතිව, මුළු course එකටම) ----
+
 $sq = $pdo->prepare("SELECT
         SUM(status='paid') AS paid_cnt,
         SUM(status='pending') AS pending_cnt,
@@ -166,7 +165,7 @@ $img = function_exists('imageUrl') ? imageUrl('courses', $course['thumbnail'] ??
 </div>
 <?php endif; ?>
 
-<!-- Course details -->
+
 <div class="table-card mb-3">
 <div class="card-header d-flex justify-content-between align-items-center">
     <span><i class="fas fa-book me-2"></i>Course Details</span>
@@ -201,7 +200,7 @@ $img = function_exists('imageUrl') ? imageUrl('courses', $course['thumbnail'] ??
     </div>
 </div></div></div>
 
-<!-- Stats -->
+
 <div class="row g-3 mb-3">
     <div class="col-6 col-lg-3"><div class="table-card p-3"><div class="text-muted small">Paid Students</div><div class="fs-4 fw-bold text-success"><?php echo (int)$stats['paid_cnt']; ?></div></div></div>
     <div class="col-6 col-lg-3"><div class="table-card p-3"><div class="text-muted small">Revenue</div><div class="fs-4 fw-bold"><?php echo formatPrice($stats['revenue']); ?></div></div></div>
@@ -318,7 +317,7 @@ $img = function_exists('imageUrl') ? imageUrl('courses', $course['thumbnail'] ??
 </div>
 
 <script>
-// Edit modal එකට row data පුරවනවා
+
 document.querySelectorAll('.btn-edit-order').forEach(function (btn) {
     btn.addEventListener('click', function () {
         document.getElementById('eo_order_id').value = btn.dataset.orderId || '';
@@ -331,7 +330,7 @@ document.querySelectorAll('.btn-edit-order').forEach(function (btn) {
     });
 });
 
-// Course delete confirm (paid orders තියෙනවා නම් DELETE type කළ යුතුයි)
+
 function confirmCourseDelete(form, paidCount) {
     if (paidCount > 0) {
         var t = prompt(

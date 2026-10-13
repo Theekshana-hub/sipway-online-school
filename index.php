@@ -8,7 +8,7 @@ $total_courses = $pdo->query("SELECT COUNT(*) FROM courses WHERE is_published=1"
 $total_students = $pdo->query("SELECT COUNT(*) FROM users WHERE role='student'")->fetchColumn();
 ?>
 
-<!-- ========== HERO ========== -->
+
 <section class="hero">
     <div class="container">
         <div class="row align-items-center">
@@ -53,13 +53,12 @@ $total_students = $pdo->query("SELECT COUNT(*) FROM users WHERE role='student'")
             </div>
         </div>
     </div>
-    <!-- Wave bottom -->
+
     <div class="hero-wave">
         <svg viewBox="0 0 1440 80" preserveAspectRatio="none"><path fill="#f8f9fa" d="M0,40 C360,80 720,0 1440,40 L1440,80 L0,80 Z"></path></svg>
     </div>
 </section>
 
-<!-- ========== CATEGORIES ========== -->
 <section class="section bg-light">
     <div class="container">
         <div class="section-header" data-aos="fade-up">
@@ -90,7 +89,7 @@ $total_students = $pdo->query("SELECT COUNT(*) FROM users WHERE role='student'")
     </div>
 </section>
 
-<!-- ========== FEATURED COURSES ========== -->
+
 <section class="section">
     <div class="container">
         <div class="section-header" data-aos="fade-up">
@@ -138,7 +137,7 @@ $total_students = $pdo->query("SELECT COUNT(*) FROM users WHERE role='student'")
     </div>
 </section>
 
-<!-- ========== WHY US ========== -->
+
 <section class="section bg-light">
     <div class="container">
         <div class="section-header" data-aos="fade-up">
@@ -167,7 +166,7 @@ $total_students = $pdo->query("SELECT COUNT(*) FROM users WHERE role='student'")
     </div>
 </section>
 
-<!-- ========== SUBJECTS GRID ========== -->
+
 <section class="section">
     <div class="container">
         <div class="section-header" data-aos="fade-up">
@@ -208,7 +207,7 @@ $total_students = $pdo->query("SELECT COUNT(*) FROM users WHERE role='student'")
     </div>
 </section>
 
-<!-- ========== CTA ========== -->
+
 <section class="section cta-section">
     <div class="container position-relative">
         <div class="row align-items-center">
@@ -225,7 +224,7 @@ $total_students = $pdo->query("SELECT COUNT(*) FROM users WHERE role='student'")
 </section>
 
 <style>
-/* Extra index animations */
+
 .hero-visual-card {
     background: rgba(255,255,255,0.07);
     backdrop-filter: blur(20px);
