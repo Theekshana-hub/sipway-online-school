@@ -16,7 +16,6 @@ $st->execute([$id]);
 $course = $st->fetch();
 if (!$course) redirect('admin-courses.php');
 
-
 $status = $_GET['status'] ?? ($_POST['f_status'] ?? '');
 $q = trim($_GET['q'] ?? ($_POST['f_q'] ?? ''));
 $allowed = ['pending','paid','failed','cancelled','chargedback'];
@@ -64,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect($back);
     }
 
-   
+    
     if ($action === 'delete_order') {
         $oid = (int)($_POST['order_id'] ?? 0);
         try {
@@ -81,13 +80,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect($back);
     }
 
-  
+    
     if ($action === 'delete_course') {
         $chk = $pdo->prepare("SELECT COUNT(*) FROM course_orders WHERE course_id = ? AND status = 'paid'");
         $chk->execute([$id]);
         $paidCount = (int)$chk->fetchColumn();
 
-       
+        
         if ($paidCount > 0 && ($_POST['confirm_text'] ?? '') !== 'DELETE') {
             $_SESSION['flash'] = ['type' => 'danger', 'msg' => 'This course has paid orders. Deletion was not confirmed.'];
             redirect($back);
@@ -108,7 +107,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     redirect($back);
 }
-
 
 $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
@@ -131,7 +129,7 @@ if (isset($_GET['export'])) {
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename="course-' . $id . '-payments-' . date('Ymd') . '.csv"');
     $out = fopen('php://output', 'w');
-    fwrite($out, "\xEF\xBB\xBF"); 
+    fwrite($out, "\xEF\xBB\xBF");
     fputcsv($out, ['Order No','Student Name','Email','Phone','Amount','Currency','Status','Txn Reference','Response Code','Terms Accepted','Created','Paid At']);
     foreach ($orders as $o) {
         fputcsv($out, [$o['order_no'],$o['billing_name'],$o['billing_email'],$o['billing_phone'],$o['amount'],$o['currency'],$o['status'],$o['txn_reference'],$o['response_code'],$o['terms_accepted']?'Yes':'No',$o['created_at'],$o['paid_at']]);
@@ -165,6 +163,28 @@ $img = function_exists('imageUrl') ? imageUrl('courses', $course['thumbnail'] ??
 </div>
 <?php endif; ?>
 
+<style>
+
+.cd-img-wrap{
+    background:linear-gradient(135deg,#f8f9fa,#eef0f3);
+    border:1px solid #e9ecef;
+    border-radius:12px;
+    padding:8px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+}
+.cd-img-wrap img{
+    display:block;
+    width:100%;
+    height:auto;          
+    max-height:320px;    
+    object-fit:contain;   
+    border-radius:8px;
+}
+</style>
+
 
 <div class="table-card mb-3">
 <div class="card-header d-flex justify-content-between align-items-center">
@@ -181,7 +201,7 @@ $img = function_exists('imageUrl') ? imageUrl('courses', $course['thumbnail'] ??
     </div>
 </div>
 <div class="p-3"><div class="row g-3">
-    <?php if ($img): ?><div class="col-md-3"><img src="<?php echo e($img); ?>" alt="" class="img-fluid rounded" style="aspect-ratio:4/3;object-fit:cover;width:100%"></div><?php endif; ?>
+    <?php if ($img): ?><div class="col-md-3"><div class="cd-img-wrap"><img src="<?php echo e($img); ?>" alt="<?php echo e($course['title']); ?>" loading="lazy"></div></div><?php endif; ?>
     <div class="<?php echo $img ? 'col-md-9' : 'col-12'; ?>">
         <h4 class="mb-1"><?php echo e($course['title']); ?>
             <?php if (!empty($course['is_featured'])): ?><span class="badge bg-warning text-dark fs-6">Featured</span><?php endif; ?>
@@ -208,7 +228,7 @@ $img = function_exists('imageUrl') ? imageUrl('courses', $course['thumbnail'] ??
     <div class="col-6 col-lg-3"><div class="table-card p-3"><div class="text-muted small">Failed / Cancelled</div><div class="fs-4 fw-bold text-danger"><?php echo (int)$stats['failed_cnt']; ?></div></div></div>
 </div>
 
-<!-- Payments -->
+
 <div class="table-card">
 <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
     <span><i class="fas fa-credit-card me-2"></i>Payments (<?php echo count($orders); ?>)</span>
@@ -269,7 +289,6 @@ $img = function_exists('imageUrl') ? imageUrl('courses', $course['thumbnail'] ??
 <?php if (empty($orders)): ?><tr><td colspan="9" class="text-center text-muted py-4">No payments found for this course.</td></tr><?php endif; ?>
 </tbody></table></div></div>
 
-<!-- Edit payment modal -->
 <div class="modal fade" id="editOrderModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <form method="POST" class="modal-content">
