@@ -85,7 +85,27 @@ if (!$alreadyPaid && $_SERVER['REQUEST_METHOD'] === 'POST') {
 ?>
 <style>
 .co-card{background:#fff;border-radius:14px;box-shadow:0 4px 20px rgba(0,0,0,.07);padding:24px}
-.co-summary img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:10px}
+
+/* ★ Course image - crop නොවී සම්පූර්ණ image එකම පෙන්නනවා */
+.co-img-wrap{
+    background:linear-gradient(135deg,#f8f9fa,#eef0f3);
+    border:1px solid #e9ecef;
+    border-radius:12px;
+    padding:8px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+}
+.co-img-wrap img{
+    display:block;
+    width:100%;
+    height:auto;          /* image එකේ original ratio එක තියාගන්නවා */
+    max-height:340px;     /* ඉතා උස image වලට සීමාවක් */
+    object-fit:contain;   /* කැපෙන්නේ නැතුව සම්පූර්ණයෙන්ම පෙන්නනවා */
+    border-radius:8px;
+}
+
 .co-total{font-size:1.5rem;font-weight:700;color:#E30613}
 .co-terms{background:#f8f9fa;border:1px solid #e5e5e5;border-radius:10px;padding:14px}
 .co-terms input{width:18px;height:18px;margin-top:3px}
@@ -139,7 +159,9 @@ if (!$alreadyPaid && $_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="co-card co-summary">
             <h5 class="mb-3"><i class="fas fa-shopping-cart me-2"></i>Order Summary</h5>
             <?php $img = imageUrl('courses', $course['thumbnail'] ?? null); if ($img): ?>
-                <img src="<?php echo e($img); ?>" alt="<?php echo e($course['title']); ?>" class="mb-3">
+                <div class="co-img-wrap mb-3">
+                    <img src="<?php echo e($img); ?>" alt="<?php echo e($course['title']); ?>" loading="lazy">
+                </div>
             <?php endif; ?>
             <h6><?php echo e($course['title']); ?></h6>
             <?php if (!empty($course['duration'])): ?><p class="text-muted small mb-2"><i class="far fa-clock"></i> <?php echo e($course['duration']); ?></p><?php endif; ?>
