@@ -2,16 +2,82 @@
 require_once __DIR__.'/includes/admin-auth.php';
 $pdo = getDB();
 
-$id = (int)($_GET['id'] ?? 0);
+if (session_status() !== PHP_SESSION_ACTIVE) { session_start(); }
+
+// ---- CSRF token ----
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+$csrf = $_SESSION['csrf_token'];
+
+$id = (int)($_GET['id'] ?? ($_POST['id'] ?? 0));
 $st = $pdo->prepare("SELECT c.*, cat.name AS cat_name FROM courses c LEFT JOIN categories cat ON c.category_id=cat.id WHERE c.id=? LIMIT 1");
 $st->execute([$id]);
 $course = $st->fetch();
 if (!$course) redirect('admin-courses.php');
 
 // ---- Filters ----
-$status = $_GET['status'] ?? '';
-$q = trim($_GET['q'] ?? '');
+$status = $_GET['status'] ?? ($_POST['status'] ?? '');
+$q = trim($_GET['q'] ?? ($_POST['q'] ?? ''));
 $allowed = ['pending','paid','failed','cancelled','chargedback'];
+
+// ---- Delete handlers (POST only, HTML output යන්න කලින්) ----
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $back = 'admin-course-payments.php?' . http_build_query(['id' => $id, 'status' => $status, 'q' => $q]);
+
+    if (!hash_equals($csrf, $_POST['csrf_token'] ?? '')) {
+        $_SESSION['flash'] = ['type' => 'danger', 'msg' => 'Invalid request token. Please try again.'];
+        redirect($back);
+    }
+
+    $action = $_POST['action'] ?? '';
+
+    // Delete a single payment / order
+    if ($action === 'delete_order') {
+        $oid = (int)($_POST['order_id'] ?? 0);
+        try {
+            // course_id check එකෙන් වෙන course එකක order එකක් delete වෙන එක නවතිනවා
+            $del = $pdo->prepare("DELETE FROM course_orders WHERE id = ? AND course_id = ?");
+            $del->execute([$oid, $id]);
+            if ($del->rowCount() > 0) {
+                $_SESSION['flash'] = ['type' => 'success', 'msg' => 'Payment record deleted successfully.'];
+            } else {
+                $_SESSION['flash'] = ['type' => 'warning', 'msg' => 'Payment record not found.'];
+            }
+        } catch (PDOException $ex) {
+            $_SESSION['flash'] = ['type' => 'danger', 'msg' => 'Could not delete this payment. It may be linked to other records.'];
+        }
+        redirect($back);
+    }
+
+    // Delete the whole course
+    if ($action === 'delete_course') {
+        $chk = $pdo->prepare("SELECT COUNT(*) FROM course_orders WHERE course_id = ? AND status = 'paid'");
+        $chk->execute([$id]);
+        if ((int)$chk->fetchColumn() > 0) {
+            $_SESSION['flash'] = ['type' => 'danger', 'msg' => 'This course has paid orders, so it cannot be deleted. Unpublish it instead.'];
+            redirect($back);
+        }
+        try {
+            $pdo->beginTransaction();
+            $pdo->prepare("DELETE FROM course_orders WHERE course_id = ?")->execute([$id]);
+            $pdo->prepare("DELETE FROM courses WHERE id = ?")->execute([$id]);
+            $pdo->commit();
+            $_SESSION['flash'] = ['type' => 'success', 'msg' => 'Course deleted successfully.'];
+            redirect('admin-courses.php');
+        } catch (PDOException $ex) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            $_SESSION['flash'] = ['type' => 'danger', 'msg' => 'Could not delete this course. It may be linked to other records.'];
+            redirect($back);
+        }
+    }
+
+    redirect($back);
+}
+
+// ---- Flash message ----
+$flash = $_SESSION['flash'] ?? null;
+unset($_SESSION['flash']);
 
 $where = "o.course_id = ?";
 $params = [$id];
@@ -58,11 +124,26 @@ $img = function_exists('imageUrl') ? imageUrl('courses', $course['thumbnail'] ??
 ?>
 <div class="mb-3"><a href="admin-courses.php" class="btn btn-sm btn-outline-secondary"><i class="fas fa-arrow-left me-1"></i> Back to Courses</a></div>
 
+<?php if ($flash): ?>
+<div class="alert alert-<?php echo e($flash['type']); ?> alert-dismissible fade show" role="alert">
+    <?php echo e($flash['msg']); ?>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+<?php endif; ?>
+
 <!-- Course details -->
 <div class="table-card mb-3">
 <div class="card-header d-flex justify-content-between align-items-center">
     <span><i class="fas fa-book me-2"></i>Course Details</span>
-    <a href="admin-edit-course.php?id=<?php echo $course['id']; ?>" class="btn btn-sm btn-outline-primary"><i class="fas fa-edit me-1"></i>Edit</a>
+    <div class="d-flex gap-2">
+        <a href="admin-edit-course.php?id=<?php echo $course['id']; ?>" class="btn btn-sm btn-outline-primary"><i class="fas fa-edit me-1"></i>Edit</a>
+        <form method="POST" class="d-inline" onsubmit="return confirm('Delete this course permanently?\n\nThis will also remove all its pending / failed payment records. This cannot be undone.');">
+            <input type="hidden" name="csrf_token" value="<?php echo e($csrf); ?>">
+            <input type="hidden" name="action" value="delete_course">
+            <input type="hidden" name="id" value="<?php echo $id; ?>">
+            <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash me-1"></i>Delete Course</button>
+        </form>
+    </div>
 </div>
 <div class="p-3"><div class="row g-3">
     <?php if ($img): ?><div class="col-md-3"><img src="<?php echo e($img); ?>" alt="" class="img-fluid rounded" style="aspect-ratio:4/3;object-fit:cover;width:100%"></div><?php endif; ?>
@@ -109,7 +190,7 @@ $img = function_exists('imageUrl') ? imageUrl('courses', $course['thumbnail'] ??
     </form>
 </div>
 <div class="table-responsive"><table class="table table-hover mb-0 align-middle">
-<thead class="table-light"><tr><th>#</th><th>Student</th><th>Contact</th><th>Order No</th><th>Amount</th><th>Status</th><th>Txn Ref</th><th>Date</th></tr></thead>
+<thead class="table-light"><tr><th>#</th><th>Student</th><th>Contact</th><th>Order No</th><th>Amount</th><th>Status</th><th>Txn Ref</th><th>Date</th><th class="text-end">Action</th></tr></thead>
 <tbody>
 <?php foreach ($orders as $i => $o): ?>
 <tr>
@@ -123,8 +204,24 @@ $img = function_exists('imageUrl') ? imageUrl('courses', $course['thumbnail'] ??
     <td class="small"><?php echo e($o['txn_reference'] ?: '-'); ?></td>
     <td class="small"><?php echo e(date('d M Y, h:i A', strtotime($o['paid_at'] ?: $o['created_at']))); ?>
         <?php if ($o['terms_accepted']): ?><div class="text-success"><i class="fas fa-check-square me-1"></i>Terms accepted</div><?php endif; ?></td>
+    <td class="text-end">
+        <?php
+            $warn = $o['status'] === 'paid'
+                ? "WARNING: This is a PAID order (" . $o['order_no'] . ").\nDeleting it will remove the payment record and affect revenue totals.\n\nDelete anyway?"
+                : "Delete order " . $o['order_no'] . "?\nThis cannot be undone.";
+        ?>
+        <form method="POST" class="d-inline" onsubmit="return confirm(<?php echo e(json_encode($warn)); ?>);">
+            <input type="hidden" name="csrf_token" value="<?php echo e($csrf); ?>">
+            <input type="hidden" name="action" value="delete_order">
+            <input type="hidden" name="id" value="<?php echo $id; ?>">
+            <input type="hidden" name="order_id" value="<?php echo (int)$o['id']; ?>">
+            <input type="hidden" name="status" value="<?php echo e($status); ?>">
+            <input type="hidden" name="q" value="<?php echo e($q); ?>">
+            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete payment"><i class="fas fa-trash"></i></button>
+        </form>
+    </td>
 </tr>
 <?php endforeach; ?>
-<?php if (empty($orders)): ?><tr><td colspan="8" class="text-center text-muted py-4">No payments found for this course.</td></tr><?php endif; ?>
+<?php if (empty($orders)): ?><tr><td colspan="9" class="text-center text-muted py-4">No payments found for this course.</td></tr><?php endif; ?>
 </tbody></table></div></div>
 <?php require_once 'includes/admin-footer.php'; ?>
