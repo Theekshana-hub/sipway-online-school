@@ -17,11 +17,11 @@ $course = $st->fetch();
 if (!$course) redirect('admin-courses.php');
 
 // ---- Filters ----
-$status = $_GET['status'] ?? ($_POST['status'] ?? '');
-$q = trim($_GET['q'] ?? ($_POST['q'] ?? ''));
+$status = $_GET['status'] ?? ($_POST['f_status'] ?? '');
+$q = trim($_GET['q'] ?? ($_POST['f_q'] ?? ''));
 $allowed = ['pending','paid','failed','cancelled','chargedback'];
 
-// ---- Delete handlers (POST only, HTML output යන්න කලින්) ----
+// ---- POST handlers (HTML output යන්න කලින්) ----
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $back = 'admin-course-payments.php?' . http_build_query(['id' => $id, 'status' => $status, 'q' => $q]);
 
@@ -32,11 +32,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $action = $_POST['action'] ?? '';
 
-    // Delete a single payment / order
+    // ---- Edit a single payment / order ----
+    if ($action === 'edit_order') {
+        $oid    = (int)($_POST['order_id'] ?? 0);
+        $name   = trim($_POST['billing_name'] ?? '');
+        $email  = trim($_POST['billing_email'] ?? '');
+        $phone  = trim($_POST['billing_phone'] ?? '');
+        $newSt  = $_POST['order_status'] ?? '';
+        $txn    = trim($_POST['txn_reference'] ?? '');
+
+        if (!in_array($newSt, $allowed, true)) {
+            $_SESSION['flash'] = ['type' => 'danger', 'msg' => 'Invalid status selected.'];
+            redirect($back);
+        }
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $_SESSION['flash'] = ['type' => 'danger', 'msg' => 'Please enter a valid email address.'];
+            redirect($back);
+        }
+
+        try {
+            // course_id check එකෙන් වෙන course එකක order එකක් edit වෙන එක නවතිනවා
+            // status එක paid වුණාම paid_at එක හිස් නම් දැන් වෙලාව දානවා
+            $up = $pdo->prepare("UPDATE course_orders
+                SET billing_name = ?, billing_email = ?, billing_phone = ?, status = ?, txn_reference = ?,
+                    paid_at = CASE WHEN ? = 'paid' AND paid_at IS NULL THEN NOW() ELSE paid_at END
+                WHERE id = ? AND course_id = ?");
+            $up->execute([$name, $email, $phone, $newSt, $txn, $newSt, $oid, $id]);
+            $_SESSION['flash'] = ['type' => 'success', 'msg' => 'Payment record updated successfully.'];
+        } catch (PDOException $ex) {
+            $_SESSION['flash'] = ['type' => 'danger', 'msg' => 'Could not update this payment record.'];
+        }
+        redirect($back);
+    }
+
+    // ---- Delete a single payment / order ----
     if ($action === 'delete_order') {
         $oid = (int)($_POST['order_id'] ?? 0);
         try {
-            // course_id check එකෙන් වෙන course එකක order එකක් delete වෙන එක නවතිනවා
             $del = $pdo->prepare("DELETE FROM course_orders WHERE id = ? AND course_id = ?");
             $del->execute([$oid, $id]);
             if ($del->rowCount() > 0) {
@@ -50,12 +82,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect($back);
     }
 
-    // Delete the whole course
+    // ---- Delete the whole course ----
     if ($action === 'delete_course') {
         $chk = $pdo->prepare("SELECT COUNT(*) FROM course_orders WHERE course_id = ? AND status = 'paid'");
         $chk->execute([$id]);
-        if ((int)$chk->fetchColumn() > 0) {
-            $_SESSION['flash'] = ['type' => 'danger', 'msg' => 'This course has paid orders, so it cannot be deleted. Unpublish it instead.'];
+        $paidCount = (int)$chk->fetchColumn();
+
+        // Paid orders තියෙනවා නම් "DELETE" type කරලා confirm කළ යුතුයි
+        if ($paidCount > 0 && ($_POST['confirm_text'] ?? '') !== 'DELETE') {
+            $_SESSION['flash'] = ['type' => 'danger', 'msg' => 'This course has paid orders. Deletion was not confirmed.'];
             redirect($back);
         }
         try {
@@ -137,10 +172,11 @@ $img = function_exists('imageUrl') ? imageUrl('courses', $course['thumbnail'] ??
     <span><i class="fas fa-book me-2"></i>Course Details</span>
     <div class="d-flex gap-2">
         <a href="admin-edit-course.php?id=<?php echo $course['id']; ?>" class="btn btn-sm btn-outline-primary"><i class="fas fa-edit me-1"></i>Edit</a>
-        <form method="POST" class="d-inline" onsubmit="return confirm('Delete this course permanently?\n\nThis will also remove all its pending / failed payment records. This cannot be undone.');">
+        <form method="POST" class="d-inline" onsubmit="return confirmCourseDelete(this, <?php echo (int)$stats['paid_cnt']; ?>);">
             <input type="hidden" name="csrf_token" value="<?php echo e($csrf); ?>">
             <input type="hidden" name="action" value="delete_course">
             <input type="hidden" name="id" value="<?php echo $id; ?>">
+            <input type="hidden" name="confirm_text" value="">
             <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash me-1"></i>Delete Course</button>
         </form>
     </div>
@@ -204,7 +240,16 @@ $img = function_exists('imageUrl') ? imageUrl('courses', $course['thumbnail'] ??
     <td class="small"><?php echo e($o['txn_reference'] ?: '-'); ?></td>
     <td class="small"><?php echo e(date('d M Y, h:i A', strtotime($o['paid_at'] ?: $o['created_at']))); ?>
         <?php if ($o['terms_accepted']): ?><div class="text-success"><i class="fas fa-check-square me-1"></i>Terms accepted</div><?php endif; ?></td>
-    <td class="text-end">
+    <td class="text-end text-nowrap">
+        <button type="button" class="btn btn-sm btn-outline-primary btn-edit-order" title="Edit payment"
+            data-bs-toggle="modal" data-bs-target="#editOrderModal"
+            data-order-id="<?php echo (int)$o['id']; ?>"
+            data-order-no="<?php echo e($o['order_no']); ?>"
+            data-name="<?php echo e($o['billing_name']); ?>"
+            data-email="<?php echo e($o['billing_email']); ?>"
+            data-phone="<?php echo e($o['billing_phone']); ?>"
+            data-status="<?php echo e($o['status']); ?>"
+            data-txn="<?php echo e($o['txn_reference']); ?>"><i class="fas fa-edit"></i></button>
         <?php
             $warn = $o['status'] === 'paid'
                 ? "WARNING: This is a PAID order (" . $o['order_no'] . ").\nDeleting it will remove the payment record and affect revenue totals.\n\nDelete anyway?"
@@ -215,8 +260,8 @@ $img = function_exists('imageUrl') ? imageUrl('courses', $course['thumbnail'] ??
             <input type="hidden" name="action" value="delete_order">
             <input type="hidden" name="id" value="<?php echo $id; ?>">
             <input type="hidden" name="order_id" value="<?php echo (int)$o['id']; ?>">
-            <input type="hidden" name="status" value="<?php echo e($status); ?>">
-            <input type="hidden" name="q" value="<?php echo e($q); ?>">
+            <input type="hidden" name="f_status" value="<?php echo e($status); ?>">
+            <input type="hidden" name="f_q" value="<?php echo e($q); ?>">
             <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete payment"><i class="fas fa-trash"></i></button>
         </form>
     </td>
@@ -224,4 +269,81 @@ $img = function_exists('imageUrl') ? imageUrl('courses', $course['thumbnail'] ??
 <?php endforeach; ?>
 <?php if (empty($orders)): ?><tr><td colspan="9" class="text-center text-muted py-4">No payments found for this course.</td></tr><?php endif; ?>
 </tbody></table></div></div>
+
+<!-- Edit payment modal -->
+<div class="modal fade" id="editOrderModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <form method="POST" class="modal-content">
+      <input type="hidden" name="csrf_token" value="<?php echo e($csrf); ?>">
+      <input type="hidden" name="action" value="edit_order">
+      <input type="hidden" name="id" value="<?php echo $id; ?>">
+      <input type="hidden" name="order_id" id="eo_order_id" value="">
+      <input type="hidden" name="f_status" value="<?php echo e($status); ?>">
+      <input type="hidden" name="f_q" value="<?php echo e($q); ?>">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-edit me-2"></i>Edit Payment <code id="eo_order_no" class="fs-6"></code></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+            <label class="form-label small">Student Name</label>
+            <input type="text" name="billing_name" id="eo_name" class="form-control" maxlength="150">
+        </div>
+        <div class="mb-3">
+            <label class="form-label small">Email</label>
+            <input type="email" name="billing_email" id="eo_email" class="form-control" maxlength="150">
+        </div>
+        <div class="mb-3">
+            <label class="form-label small">Phone</label>
+            <input type="text" name="billing_phone" id="eo_phone" class="form-control" maxlength="30">
+        </div>
+        <div class="mb-3">
+            <label class="form-label small">Status</label>
+            <select name="order_status" id="eo_status" class="form-select">
+                <?php foreach ($allowed as $s): ?><option value="<?php echo $s; ?>"><?php echo ucfirst($s); ?></option><?php endforeach; ?>
+            </select>
+        </div>
+        <div class="mb-1">
+            <label class="form-label small">Txn Reference</label>
+            <input type="text" name="txn_reference" id="eo_txn" class="form-control" maxlength="100">
+        </div>
+        <div class="form-text">Amount and order number cannot be changed here.</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+// Edit modal එකට row data පුරවනවා
+document.querySelectorAll('.btn-edit-order').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+        document.getElementById('eo_order_id').value = btn.dataset.orderId || '';
+        document.getElementById('eo_order_no').textContent = btn.dataset.orderNo || '';
+        document.getElementById('eo_name').value = btn.dataset.name || '';
+        document.getElementById('eo_email').value = btn.dataset.email || '';
+        document.getElementById('eo_phone').value = btn.dataset.phone || '';
+        document.getElementById('eo_status').value = btn.dataset.status || 'pending';
+        document.getElementById('eo_txn').value = btn.dataset.txn || '';
+    });
+});
+
+// Course delete confirm (paid orders තියෙනවා නම් DELETE type කළ යුතුයි)
+function confirmCourseDelete(form, paidCount) {
+    if (paidCount > 0) {
+        var t = prompt(
+            'WARNING: This course has ' + paidCount + ' paid order(s).\n' +
+            'Deleting it will permanently remove ALL its payment records and revenue history.\n\n' +
+            'Type DELETE to confirm:'
+        );
+        if (t !== 'DELETE') return false;
+        form.elements['confirm_text'].value = t;
+        return true;
+    }
+    return confirm('Delete this course permanently?\n\nThis will also remove all its pending / failed payment records. This cannot be undone.');
+}
+</script>
 <?php require_once 'includes/admin-footer.php'; ?>
