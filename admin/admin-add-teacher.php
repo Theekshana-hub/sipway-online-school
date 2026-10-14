@@ -3,7 +3,7 @@ require_once __DIR__.'/includes/admin-auth.php';
 $pdo = getDB();
 $error = '';
 
-// Subjects list (for re-filling the form if there is an error)
+
 $postedSubjects = [''];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -12,13 +12,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $phone = trim($_POST['phone'] ?? '');
     $bio   = trim($_POST['bio'] ?? '');
 
-    // Multiple subjects: subject[] array -> cleaned -> "A, B, C"
+   
     $rawSubjects = $_POST['subject'] ?? [];
     if (!is_array($rawSubjects)) $rawSubjects = [$rawSubjects];
 
     $subjectList = [];
     foreach ($rawSubjects as $s) {
-        $s = trim(str_replace(',', ' ', (string)$s)); // comma is our separator
+        $s = trim(str_replace(',', ' ', (string)$s));
         $s = preg_replace('/\s+/', ' ', $s);
         if ($s !== '' && !in_array(mb_strtolower($s), array_map('mb_strtolower', $subjectList), true)) {
             $subjectList[] = $s;
@@ -117,10 +117,10 @@ require_once 'includes/admin-header.php';
         var rows = list.querySelectorAll('.subject-row');
         var row = btn.closest('.subject-row');
         if (rows.length > 1) row.remove();
-        else row.querySelector('input').value = ''; // keep at least one box
+        else row.querySelector('input').value = ''; 
     });
 
-    // Press Enter in a subject box = add a new box (instead of submitting the form)
+
     list.addEventListener('keydown', function (e) {
         if (e.key === 'Enter' && e.target.name === 'subject[]') {
             e.preventDefault();
