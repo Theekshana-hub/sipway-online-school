@@ -81,17 +81,25 @@ $teachers = $pdo->query("SELECT * FROM teachers WHERE status='active' ORDER BY f
 .teacher-body h4 {
     color: var(--black, #1A1A1A);
     font-weight: 700;
-    margin-bottom: 6px;
+    margin-bottom: 10px;
+}
+
+/* Multiple subjects */
+.teacher-subjects {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    margin-bottom: 14px;
 }
 .teacher-subject {
     display: inline-block;
     color: #E30613;
     font-weight: 600;
-    font-size: .9rem;
+    font-size: .85rem;
     background: rgba(227,6,19,.08);
     padding: 4px 14px;
     border-radius: 50px;
-    margin-bottom: 12px;
 }
 .teacher-bio {
     color: #666;
@@ -117,7 +125,10 @@ $teachers = $pdo->query("SELECT * FROM teachers WHERE status='active' ORDER BY f
     <div class="container">
         <div class="row g-4">
             <?php foreach ($teachers as $i => $t): ?>
-                <?php $tImg = imageUrl('teachers', $t['photo'] ?? null); ?>
+                <?php
+                    $tImg = imageUrl('teachers', $t['photo'] ?? null);
+                    $subjects = array_filter(array_map('trim', explode(',', (string)($t['subject'] ?? ''))));
+                ?>
                 <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="<?php echo $i * 80; ?>">
                     <div class="teacher-card">
 
@@ -135,7 +146,15 @@ $teachers = $pdo->query("SELECT * FROM teachers WHERE status='active' ORDER BY f
 
                         <div class="teacher-body">
                             <h4><?php echo e($t['full_name']); ?></h4>
-                            <span class="teacher-subject"><?php echo e($t['subject']); ?></span>
+
+                            <?php if ($subjects): ?>
+                                <div class="teacher-subjects">
+                                    <?php foreach ($subjects as $sub): ?>
+                                        <span class="teacher-subject"><?php echo e($sub); ?></span>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php endif; ?>
+
                             <p class="teacher-bio"><?php echo e($t['bio']); ?></p>
                         </div>
 
