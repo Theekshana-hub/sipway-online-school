@@ -3,28 +3,63 @@ $page_title = 'Teachers';
 require_once 'includes/header.php';
 $pdo = getDB();
 
-$subject_filter = trim($_GET['subject'] ?? '');
-$search = trim($_GET['q'] ?? '');
+$cat_slug = $_GET['cat'] ?? '';
+$search   = trim($_GET['q'] ?? '');
 
-// ----- All active teachers -----
+// ===== Categories tree =====
+$allCats = $pdo->query("SELECT * FROM categories ORDER BY sort_order, name")->fetchAll();
+$topCats = [];
+$subCats = [];
+$activeParentSlug = '';
+
+foreach ($allCats as $ct) {
+    if (empty($ct['parent_id'])) {
+        $topCats[] = $ct;
+    } else {
+        $subCats[$ct['parent_id']][] = $ct;
+    }
+}
+
+// Active sub-category එකක් නම් parent එක open කරන්න
+foreach ($topCats as $t) {
+    foreach ($subCats[$t['id']] ?? [] as $s) {
+        if ($s['slug'] === $cat_slug) {
+            $activeParentSlug = $t['slug'];
+            break 2;
+        }
+    }
+}
+
+// ===== Teachers filter =====
+// Text eka normalize karanawa: trim, lowercase, extra spaces ain karanawa, dash -> space
+$norm = function ($s) {
+    $s = mb_strtolower(trim((string)$s), 'UTF-8');
+    $s = str_replace(['-', '_'], ' ', $s);
+    return preg_replace('/\s+/u', ' ', $s);
+};
+
+// Selected category (+ parent nam sub categories) walata match keys hadanawa
+$matchKeys = [];
+if ($cat_slug) {
+    foreach ($allCats as $ct) {
+        if ($ct['slug'] === $cat_slug) {
+            $matchKeys[] = $norm($ct['name']);
+            $matchKeys[] = $norm($ct['slug']);
+
+            if (empty($ct['parent_id'])) {
+                foreach ($subCats[$ct['id']] ?? [] as $sub) {
+                    $matchKeys[] = $norm($sub['name']);
+                    $matchKeys[] = $norm($sub['slug']);
+                }
+            }
+            break;
+        }
+    }
+}
+
+// Search eka SQL eken, category eka PHP eken filter karanawa
 $sql = "SELECT * FROM teachers WHERE status = 'active'";
 $params = [];
-
-if ($subject_filter !== '') {
-    // comma-separated list එකේ exact match එකක් හොයනවා (spaces handle කරලා)
-    $sql .= " AND (
-        FIND_IN_SET(?, REPLACE(subject, ', ', ',')) > 0
-        OR subject = ?
-        OR subject LIKE ?
-        OR subject LIKE ?
-        OR subject LIKE ?
-    )";
-    $params[] = $subject_filter;
-    $params[] = $subject_filter;
-    $params[] = $subject_filter . ',%';
-    $params[] = '%,' . $subject_filter;
-    $params[] = '%,' . $subject_filter . ',%';
-}
 
 if ($search !== '') {
     $sql .= " AND (full_name LIKE ? OR bio LIKE ? OR subject LIKE ?)";
@@ -38,16 +73,16 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $teachers = $stmt->fetchAll();
 
-// ----- Unique subjects list (sidebar සඳහා) -----
-$allSubjectsRaw = $pdo->query("SELECT subject FROM teachers WHERE status = 'active' AND subject IS NOT NULL AND subject != ''")->fetchAll(PDO::FETCH_COLUMN);
-$allSubjects = [];
-foreach ($allSubjectsRaw as $raw) {
-    foreach (array_filter(array_map('trim', explode(',', (string)$raw))) as $s) {
-        if ($s !== '') $allSubjects[$s] = true;
-    }
+if ($cat_slug && $matchKeys) {
+    $teachers = array_values(array_filter($teachers, function ($t) use ($norm, $matchKeys) {
+        foreach (explode(',', (string)($t['subject'] ?? '')) as $s) {
+            if (in_array($norm($s), $matchKeys, true)) {
+                return true;
+            }
+        }
+        return false;
+    }));
 }
-$allSubjects = array_keys($allSubjects);
-sort($allSubjects, SORT_NATURAL | SORT_FLAG_CASE);
 ?>
 
 <style>
@@ -66,7 +101,6 @@ sort($allSubjects, SORT_NATURAL | SORT_FLAG_CASE);
     box-shadow: 0 14px 36px rgba(227,6,19,.18);
 }
 
-/* Photo area: full image visible, no cropping */
 .teacher-photo {
     position: relative;
     width: 100%;
@@ -85,8 +119,10 @@ sort($allSubjects, SORT_NATURAL | SORT_FLAG_CASE);
     filter: blur(22px) brightness(.7);
     transform: scale(1.1);
 }
+/* FIX: img eka absolute karala height 0 wena eka nawathwala */
 .teacher-photo img {
-    position: relative;
+    position: absolute;
+    inset: 0;
     z-index: 1;
     width: 100%;
     height: 100%;
@@ -105,7 +141,6 @@ sort($allSubjects, SORT_NATURAL | SORT_FLAG_CASE);
     z-index: 2;
 }
 
-/* Fallback when no photo */
 .teacher-photo.no-photo {
     background: linear-gradient(135deg, #1A1A1A, #E30613);
 }
@@ -129,15 +164,14 @@ sort($allSubjects, SORT_NATURAL | SORT_FLAG_CASE);
     margin-bottom: 10px;
 }
 
-/* Multiple subjects */
-.teacher-subjects {
+.teacher-grades {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
     gap: 6px;
     margin-bottom: 14px;
 }
-.teacher-subject {
+.teacher-grade {
     display: inline-block;
     color: #E30613;
     font-weight: 600;
@@ -146,17 +180,12 @@ sort($allSubjects, SORT_NATURAL | SORT_FLAG_CASE);
     padding: 4px 14px;
     border-radius: 50px;
 }
+
 .teacher-bio {
     color: #666;
     font-size: .93rem;
     line-height: 1.6;
     margin: 0;
-}
-
-/* Sidebar styles (courses page එකට match වෙන්න) */
-.lesson-sidebar .lesson-list a.active {
-    font-weight: 600;
-    color: #E30613;
 }
 </style>
 
@@ -176,34 +205,54 @@ sort($allSubjects, SORT_NATURAL | SORT_FLAG_CASE);
     <div class="container">
         <div class="row g-4">
 
-            <!-- ===== Sidebar ===== -->
+            <!-- Sidebar -->
             <div class="col-lg-3">
                 <div class="lesson-sidebar" data-aos="fade-right">
-                    <h5><i class="fas fa-filter me-2"></i>Subjects</h5>
+                    <h5><i class="fas fa-filter me-2"></i>Categories</h5>
                     <ul class="lesson-list">
                         <li>
-                            <a href="teachers.php" class="<?php echo $subject_filter === '' ? 'active' : ''; ?>">
+                            <a href="teachers.php" class="<?php echo !$cat_slug ? 'active' : ''; ?>">
                                 <i class="fas fa-th"></i> All Teachers
                             </a>
                         </li>
-                        <?php foreach ($allSubjects as $sub): ?>
+
+                        <?php foreach ($topCats as $cat):
+                            $subs   = $subCats[$cat['id']] ?? [];
+                            $isOpen = ($cat_slug === $cat['slug'] || $activeParentSlug === $cat['slug']);
+                        ?>
                             <li>
-                                <a href="teachers.php?subject=<?php echo urlencode($sub); ?>"
-                                   class="<?php echo $subject_filter === $sub ? 'active' : ''; ?>">
-                                    <i class="fas fa-book-open"></i> <?php echo e($sub); ?>
+                                <a href="teachers.php?cat=<?php echo e($cat['slug']); ?>"
+                                   class="<?php echo $cat_slug === $cat['slug'] ? 'active' : ''; ?>">
+                                    <i class="<?php echo e($cat['icon']); ?>"></i>
+                                    <?php echo e($cat['name']); ?>
+                                    <?php if ($subs): ?>
+                                        <i class="fas fa-chevron-<?php echo $isOpen ? 'up' : 'down'; ?> float-end small mt-1"></i>
+                                    <?php endif; ?>
                                 </a>
                             </li>
+
+                            <?php if ($subs && $isOpen): ?>
+                                <?php foreach ($subs as $sub): ?>
+                                    <li style="padding-left:18px">
+                                        <a href="teachers.php?cat=<?php echo e($sub['slug']); ?>"
+                                           class="<?php echo $cat_slug === $sub['slug'] ? 'active' : ''; ?>"
+                                           style="font-size:.92em">
+                                            <i class="fas fa-angle-right"></i> <?php echo e($sub['name']); ?>
+                                        </a>
+                                    </li>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
                         <?php endforeach; ?>
                     </ul>
 
                     <h5 class="mt-3"><i class="fas fa-search me-2"></i>Search</h5>
                     <form method="GET" class="mt-2">
-                        <?php if ($subject_filter !== ''): ?>
-                            <input type="hidden" name="subject" value="<?php echo e($subject_filter); ?>">
+                        <?php if ($cat_slug): ?>
+                            <input type="hidden" name="cat" value="<?php echo e($cat_slug); ?>">
                         <?php endif; ?>
                         <div class="input-group">
                             <input type="text" name="q" class="form-control form-control-sm"
-                                   placeholder="Search teacher..."
+                                   placeholder="Search..."
                                    value="<?php echo e($search); ?>">
                             <button class="btn btn-primary btn-sm" type="submit">
                                 <i class="fas fa-search"></i>
@@ -213,13 +262,10 @@ sort($allSubjects, SORT_NATURAL | SORT_FLAG_CASE);
                 </div>
             </div>
 
-            <!-- ===== Teachers Grid ===== -->
+            <!-- Teachers Grid -->
             <div class="col-lg-9">
                 <p class="text-muted mb-3" data-aos="fade-up">
                     <?php echo count($teachers); ?> teacher(s) found
-                    <?php if ($subject_filter): ?>
-                        in <strong><?php echo e($subject_filter); ?></strong>
-                    <?php endif; ?>
                 </p>
 
                 <?php if (empty($teachers)): ?>
@@ -232,7 +278,7 @@ sort($allSubjects, SORT_NATURAL | SORT_FLAG_CASE);
                     <div class="row g-4">
                         <?php foreach ($teachers as $i => $t): ?>
                             <?php
-                                $tImg = imageUrl('teachers', $t['photo'] ?? null);
+                                $tImg     = imageUrl('teachers', $t['photo'] ?? null);
                                 $subjects = array_filter(array_map('trim', explode(',', (string)($t['subject'] ?? ''))));
                             ?>
                             <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="<?php echo ($i % 3) * 80; ?>">
@@ -242,7 +288,8 @@ sort($allSubjects, SORT_NATURAL | SORT_FLAG_CASE);
                                         <div class="teacher-photo" style="--photo:url('<?php echo e($tImg); ?>')">
                                             <img src="<?php echo e($tImg); ?>"
                                                  alt="<?php echo e($t['full_name']); ?>"
-                                                 loading="lazy">
+                                                 loading="lazy"
+                                                 onerror="this.style.display='none'; this.parentElement.classList.add('no-photo'); this.parentElement.innerHTML='<i class=\'fas fa-user-tie\'></i>';">
                                         </div>
                                     <?php else: ?>
                                         <div class="teacher-photo no-photo">
@@ -254,13 +301,9 @@ sort($allSubjects, SORT_NATURAL | SORT_FLAG_CASE);
                                         <h4><?php echo e($t['full_name']); ?></h4>
 
                                         <?php if ($subjects): ?>
-                                            <div class="teacher-subjects">
+                                            <div class="teacher-grades">
                                                 <?php foreach ($subjects as $sub): ?>
-                                                    <a href="teachers.php?subject=<?php echo urlencode($sub); ?>"
-                                                       class="teacher-subject"
-                                                       style="text-decoration:none;">
-                                                        <?php echo e($sub); ?>
-                                                    </a>
+                                                    <span class="teacher-grade"><?php echo e($sub); ?></span>
                                                 <?php endforeach; ?>
                                             </div>
                                         <?php endif; ?>
