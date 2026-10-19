@@ -3,6 +3,8 @@ require_once __DIR__.'/includes/admin-auth.php';
 $pdo = getDB();
 $error = '';
 
+// Category list (dropdown ekata)
+$categories = $pdo->query("SELECT id, name FROM categories ORDER BY name")->fetchAll();
 
 $postedSubjects = [''];
 
@@ -12,7 +14,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $phone = trim($_POST['phone'] ?? '');
     $bio   = trim($_POST['bio'] ?? '');
 
-   
+    // Category (optional) - valid id ekakda balanawa
+    $categoryId = (int)($_POST['category_id'] ?? 0);
+    $validIds = array_map('intval', array_column($categories, 'id'));
+    if (!in_array($categoryId, $validIds, true)) $categoryId = null;
+
     $rawSubjects = $_POST['subject'] ?? [];
     if (!is_array($rawSubjects)) $rawSubjects = [$rawSubjects];
 
@@ -33,8 +39,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($photo === false) $error = 'Image upload failed. Use JPG/PNG/WebP under 5MB.';
         else {
             if (!$photo) $photo = 'default-teacher.jpg';
-            $pdo->prepare("INSERT INTO teachers (full_name,email,phone,subject,bio,photo) VALUES (?,?,?,?,?,?)")
-                ->execute([$name,$email,$phone,$subject,$bio,$photo]);
+            $pdo->prepare("INSERT INTO teachers (full_name,email,phone,subject,category_id,bio,photo) VALUES (?,?,?,?,?,?,?)")
+                ->execute([$name,$email,$phone,$subject,$categoryId,$bio,$photo]);
             redirect('admin-teachers.php?msg=added');
         }
     }
@@ -42,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $page_title = 'Add Teacher';
 require_once 'includes/admin-header.php';
 ?>
-<?php if ($error): ?><div class="alert alert-danger"><?php echo $error; ?></div><?php endif; ?>
+<?php if ($error): ?><div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div><?php endif; ?>
 <div class="table-card"><div class="card-header">Add Teacher</div><div class="p-4">
 <form method="POST" enctype="multipart/form-data"><div class="row g-3">
 
@@ -50,6 +56,19 @@ require_once 'includes/admin-header.php';
     <label class="form-label">Full Name *</label>
     <input type="text" name="full_name" class="form-control" required
            value="<?php echo htmlspecialchars($_POST['full_name'] ?? ''); ?>">
+</div>
+
+<div class="col-md-6">
+    <label class="form-label">Category</label>
+    <select name="category_id" class="form-select">
+        <option value="">-- Select Category --</option>
+        <?php foreach ($categories as $c): ?>
+        <option value="<?php echo (int)$c['id']; ?>"
+            <?php echo ((int)($_POST['category_id'] ?? 0) === (int)$c['id']) ? 'selected' : ''; ?>>
+            <?php echo htmlspecialchars($c['name']); ?>
+        </option>
+        <?php endforeach; ?>
+    </select>
 </div>
 
 <div class="col-md-6">
@@ -117,9 +136,8 @@ require_once 'includes/admin-header.php';
         var rows = list.querySelectorAll('.subject-row');
         var row = btn.closest('.subject-row');
         if (rows.length > 1) row.remove();
-        else row.querySelector('input').value = ''; 
+        else row.querySelector('input').value = '';
     });
-
 
     list.addEventListener('keydown', function (e) {
         if (e.key === 'Enter' && e.target.name === 'subject[]') {

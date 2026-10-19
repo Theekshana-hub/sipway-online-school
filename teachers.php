@@ -10,7 +10,6 @@ $search   = trim($_GET['q'] ?? '');
 $allCats = $pdo->query("SELECT * FROM categories ORDER BY sort_order, name")->fetchAll();
 $topCats = [];
 $subCats = [];
-$activeParentSlug = '';
 
 foreach ($allCats as $ct) {
     if (empty($ct['parent_id'])) {
@@ -20,69 +19,44 @@ foreach ($allCats as $ct) {
     }
 }
 
-// Active sub-category එකක් නම් parent එක open කරන්න
-foreach ($topCats as $t) {
-    foreach ($subCats[$t['id']] ?? [] as $s) {
-        if ($s['slug'] === $cat_slug) {
-            $activeParentSlug = $t['slug'];
-            break 2;
-        }
-    }
-}
-
-// ===== Teachers filter =====
-// Text eka normalize karanawa: trim, lowercase, extra spaces ain karanawa, dash -> space
-$norm = function ($s) {
-    $s = mb_strtolower(trim((string)$s), 'UTF-8');
-    $s = str_replace(['-', '_'], ' ', $s);
-    return preg_replace('/\s+/u', ' ', $s);
-};
-
-// Selected category (+ parent nam sub categories) walata match keys hadanawa
-$matchKeys = [];
-if ($cat_slug) {
-    foreach ($allCats as $ct) {
-        if ($ct['slug'] === $cat_slug) {
-            $matchKeys[] = $norm($ct['name']);
-            $matchKeys[] = $norm($ct['slug']);
-
-            if (empty($ct['parent_id'])) {
-                foreach ($subCats[$ct['id']] ?? [] as $sub) {
-                    $matchKeys[] = $norm($sub['name']);
-                    $matchKeys[] = $norm($sub['slug']);
-                }
+// ===== Selected category (+ parent nam sub categories ekathu karanawa) =====
+$filterIds = [];
+foreach ($allCats as $ct) {
+    if ($cat_slug !== '' && $ct['slug'] === $cat_slug) {
+        $filterIds[] = (int)$ct['id'];
+        if (empty($ct['parent_id'])) {
+            foreach ($subCats[$ct['id']] ?? [] as $sub) {
+                $filterIds[] = (int)$sub['id'];
             }
-            break;
         }
+        break;
     }
 }
 
-// Search eka SQL eken, category eka PHP eken filter karanawa
-$sql = "SELECT * FROM teachers WHERE status = 'active'";
+// ===== Teachers query =====
+$sql = "SELECT t.*, c.name AS category_name
+        FROM teachers t
+        LEFT JOIN categories c ON c.id = t.category_id
+        WHERE t.status = 'active'";
 $params = [];
 
+if ($filterIds) {
+    $placeholders = implode(',', array_fill(0, count($filterIds), '?'));
+    $sql .= " AND t.category_id IN ($placeholders)";
+    $params = array_merge($params, $filterIds);
+}
+
 if ($search !== '') {
-    $sql .= " AND (full_name LIKE ? OR bio LIKE ? OR subject LIKE ?)";
+    $sql .= " AND (t.full_name LIKE ? OR t.bio LIKE ? OR t.subject LIKE ?)";
     $params[] = "%$search%";
     $params[] = "%$search%";
     $params[] = "%$search%";
 }
 
-$sql .= " ORDER BY full_name";
+$sql .= " ORDER BY t.full_name";
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $teachers = $stmt->fetchAll();
-
-if ($cat_slug && $matchKeys) {
-    $teachers = array_values(array_filter($teachers, function ($t) use ($norm, $matchKeys) {
-        foreach (explode(',', (string)($t['subject'] ?? '')) as $s) {
-            if (in_array($norm($s), $matchKeys, true)) {
-                return true;
-            }
-        }
-        return false;
-    }));
-}
 ?>
 
 <style>
@@ -119,7 +93,6 @@ if ($cat_slug && $matchKeys) {
     filter: blur(22px) brightness(.7);
     transform: scale(1.1);
 }
-/* FIX: img eka absolute karala height 0 wena eka nawathwala */
 .teacher-photo img {
     position: absolute;
     inset: 0;
@@ -151,6 +124,19 @@ if ($cat_slug && $matchKeys) {
     font-size: 4rem;
     color: #fff;
     opacity: .9;
+}
+
+.teacher-cat-badge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    z-index: 3;
+    background: rgba(26,26,26,.85);
+    color: #fff;
+    font-size: .75rem;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 50px;
 }
 
 .teacher-body {
@@ -208,48 +194,39 @@ if ($cat_slug && $matchKeys) {
             <!-- Sidebar -->
             <div class="col-lg-3">
                 <div class="lesson-sidebar" data-aos="fade-right">
-                    <h5><i class="fas fa-filter me-2"></i>Categories</h5>
-                    <ul class="lesson-list">
-                        <li>
-                            <a href="teachers.php" class="<?php echo !$cat_slug ? 'active' : ''; ?>">
-                                <i class="fas fa-th"></i> All Teachers
-                            </a>
-                        </li>
+                    <h5><i class="fas fa-filter me-2"></i>Filter</h5>
 
-                        <?php foreach ($topCats as $cat):
-                            $subs   = $subCats[$cat['id']] ?? [];
-                            $isOpen = ($cat_slug === $cat['slug'] || $activeParentSlug === $cat['slug']);
-                        ?>
-                            <li>
-                                <a href="teachers.php?cat=<?php echo e($cat['slug']); ?>"
-                                   class="<?php echo $cat_slug === $cat['slug'] ? 'active' : ''; ?>">
-                                    <i class="<?php echo e($cat['icon']); ?>"></i>
-                                    <?php echo e($cat['name']); ?>
-                                    <?php if ($subs): ?>
-                                        <i class="fas fa-chevron-<?php echo $isOpen ? 'up' : 'down'; ?> float-end small mt-1"></i>
-                                    <?php endif; ?>
-                                </a>
-                            </li>
+                    <form method="GET" id="filterForm" class="mt-2">
+                        <label class="form-label small mb-1">Category</label>
+                        <select name="cat" class="form-select form-select-sm mb-3"
+                                onchange="document.getElementById('filterForm').submit()">
+                            <option value="">All Categories</option>
+                            <?php foreach ($topCats as $cat):
+                                $subs = $subCats[$cat['id']] ?? [];
+                            ?>
+                                <?php if ($subs): ?>
+                                    <optgroup label="<?php echo e($cat['name']); ?>">
+                                        <option value="<?php echo e($cat['slug']); ?>"
+                                            <?php echo $cat_slug === $cat['slug'] ? 'selected' : ''; ?>>
+                                            All <?php echo e($cat['name']); ?>
+                                        </option>
+                                        <?php foreach ($subs as $sub): ?>
+                                            <option value="<?php echo e($sub['slug']); ?>"
+                                                <?php echo $cat_slug === $sub['slug'] ? 'selected' : ''; ?>>
+                                                <?php echo e($sub['name']); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </optgroup>
+                                <?php else: ?>
+                                    <option value="<?php echo e($cat['slug']); ?>"
+                                        <?php echo $cat_slug === $cat['slug'] ? 'selected' : ''; ?>>
+                                        <?php echo e($cat['name']); ?>
+                                    </option>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                        </select>
 
-                            <?php if ($subs && $isOpen): ?>
-                                <?php foreach ($subs as $sub): ?>
-                                    <li style="padding-left:18px">
-                                        <a href="teachers.php?cat=<?php echo e($sub['slug']); ?>"
-                                           class="<?php echo $cat_slug === $sub['slug'] ? 'active' : ''; ?>"
-                                           style="font-size:.92em">
-                                            <i class="fas fa-angle-right"></i> <?php echo e($sub['name']); ?>
-                                        </a>
-                                    </li>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
-                        <?php endforeach; ?>
-                    </ul>
-
-                    <h5 class="mt-3"><i class="fas fa-search me-2"></i>Search</h5>
-                    <form method="GET" class="mt-2">
-                        <?php if ($cat_slug): ?>
-                            <input type="hidden" name="cat" value="<?php echo e($cat_slug); ?>">
-                        <?php endif; ?>
+                        <label class="form-label small mb-1">Search</label>
                         <div class="input-group">
                             <input type="text" name="q" class="form-control form-control-sm"
                                    placeholder="Search..."
@@ -258,6 +235,12 @@ if ($cat_slug && $matchKeys) {
                                 <i class="fas fa-search"></i>
                             </button>
                         </div>
+
+                        <?php if ($cat_slug || $search !== ''): ?>
+                            <a href="teachers.php" class="btn btn-outline-secondary btn-sm w-100 mt-3">
+                                <i class="fas fa-times me-1"></i> Clear Filters
+                            </a>
+                        <?php endif; ?>
                     </form>
                 </div>
             </div>
@@ -286,6 +269,9 @@ if ($cat_slug && $matchKeys) {
 
                                     <?php if ($tImg): ?>
                                         <div class="teacher-photo" style="--photo:url('<?php echo e($tImg); ?>')">
+                                            <?php if (!empty($t['category_name'])): ?>
+                                                <span class="teacher-cat-badge"><?php echo e($t['category_name']); ?></span>
+                                            <?php endif; ?>
                                             <img src="<?php echo e($tImg); ?>"
                                                  alt="<?php echo e($t['full_name']); ?>"
                                                  loading="lazy"
@@ -293,6 +279,9 @@ if ($cat_slug && $matchKeys) {
                                         </div>
                                     <?php else: ?>
                                         <div class="teacher-photo no-photo">
+                                            <?php if (!empty($t['category_name'])): ?>
+                                                <span class="teacher-cat-badge"><?php echo e($t['category_name']); ?></span>
+                                            <?php endif; ?>
                                             <i class="fas fa-user-tie"></i>
                                         </div>
                                     <?php endif; ?>

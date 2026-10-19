@@ -8,6 +8,8 @@ $t = $stmt->fetch();
 if (!$t) redirect('admin-teachers.php');
 $error = '';
 
+// Category list (dropdown ekata)
+$categories = $pdo->query("SELECT id, name FROM categories ORDER BY name")->fetchAll();
 
 $currentSubjects = array_values(array_filter(array_map('trim', explode(',', (string)($t['subject'] ?? '')))));
 $postedSubjects = $currentSubjects ?: [''];
@@ -19,13 +21,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $bio    = trim($_POST['bio']??'');
     $status = $_POST['status']??'active';
 
-   
+    // Category (optional) - valid id ekakda balanawa
+    $categoryId = (int)($_POST['category_id'] ?? 0);
+    $validIds = array_map('intval', array_column($categories, 'id'));
+    if (!in_array($categoryId, $validIds, true)) $categoryId = null;
+
     $rawSubjects = $_POST['subject'] ?? [];
     if (!is_array($rawSubjects)) $rawSubjects = [$rawSubjects];
 
     $subjectList = [];
     foreach ($rawSubjects as $s) {
-        $s = trim(str_replace(',', ' ', (string)$s)); 
+        $s = trim(str_replace(',', ' ', (string)$s));
         $s = preg_replace('/\s+/', ' ', $s);
         if ($s !== '' && !in_array(mb_strtolower($s), array_map('mb_strtolower', $subjectList), true)) {
             $subjectList[] = $s;
@@ -39,8 +45,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $photo = uploadImage('photo', 'teachers', $t['photo']);
         if ($photo === false) $error = 'Image upload failed. Use JPG/PNG/WebP under 5MB.';
         else {
-            $pdo->prepare("UPDATE teachers SET full_name=?,email=?,phone=?,subject=?,bio=?,photo=?,status=? WHERE id=?")
-                ->execute([$name,$email,$phone,$subject,$bio,$photo,$status,$id]);
+            $pdo->prepare("UPDATE teachers SET full_name=?,email=?,phone=?,subject=?,category_id=?,bio=?,photo=?,status=? WHERE id=?")
+                ->execute([$name,$email,$phone,$subject,$categoryId,$bio,$photo,$status,$id]);
             redirect('admin-teachers.php?msg=updated');
         }
     }
@@ -48,8 +54,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $page_title = 'Edit Teacher';
 require_once 'includes/admin-header.php';
 $photoUrl = imageUrl('teachers', $t['photo']);
+$curCategory = $_SERVER['REQUEST_METHOD']==='POST' ? (int)($_POST['category_id'] ?? 0) : (int)($t['category_id'] ?? 0);
 ?>
-<?php if ($error): ?><div class="alert alert-danger"><?php echo $error; ?></div><?php endif; ?>
+<?php if ($error): ?><div class="alert alert-danger"><?php echo e($error); ?></div><?php endif; ?>
 <div class="table-card"><div class="card-header">Edit: <?php echo e($t['full_name']); ?></div><div class="p-4">
 <form method="POST" enctype="multipart/form-data"><div class="row g-3">
 
@@ -57,6 +64,18 @@ $photoUrl = imageUrl('teachers', $t['photo']);
     <label class="form-label">Full Name *</label>
     <input type="text" name="full_name" class="form-control" required
            value="<?php echo e($_SERVER['REQUEST_METHOD']==='POST' ? ($_POST['full_name'] ?? '') : $t['full_name']); ?>">
+</div>
+
+<div class="col-md-6">
+    <label class="form-label">Category</label>
+    <select name="category_id" class="form-select">
+        <option value="">-- Select Category --</option>
+        <?php foreach ($categories as $c): ?>
+        <option value="<?php echo (int)$c['id']; ?>" <?php echo $curCategory === (int)$c['id'] ? 'selected' : ''; ?>>
+            <?php echo e($c['name']); ?>
+        </option>
+        <?php endforeach; ?>
+    </select>
 </div>
 
 <div class="col-md-6">
@@ -136,10 +155,9 @@ $photoUrl = imageUrl('teachers', $t['photo']);
         var rows = list.querySelectorAll('.subject-row');
         var row = btn.closest('.subject-row');
         if (rows.length > 1) row.remove();
-        else row.querySelector('input').value = ''; 
+        else row.querySelector('input').value = '';
     });
 
-   
     list.addEventListener('keydown', function (e) {
         if (e.key === 'Enter' && e.target.name === 'subject[]') {
             e.preventDefault();
