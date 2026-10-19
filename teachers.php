@@ -33,16 +33,19 @@ foreach ($allCats as $ct) {
     }
 }
 
-// ===== Teachers query =====
-$sql = "SELECT t.*, c.name AS category_name
+// ===== Teachers query (teacher_categories table eken) =====
+$sql = "SELECT t.*,
+               GROUP_CONCAT(DISTINCT c.name ORDER BY c.name SEPARATOR '||') AS category_names
         FROM teachers t
-        LEFT JOIN categories c ON c.id = t.category_id
+        LEFT JOIN teacher_categories tc ON tc.teacher_id = t.id
+        LEFT JOIN categories c ON c.id = tc.category_id
         WHERE t.status = 'active'";
 $params = [];
 
 if ($filterIds) {
     $placeholders = implode(',', array_fill(0, count($filterIds), '?'));
-    $sql .= " AND t.category_id IN ($placeholders)";
+    $sql .= " AND EXISTS (SELECT 1 FROM teacher_categories f
+                          WHERE f.teacher_id = t.id AND f.category_id IN ($placeholders))";
     $params = array_merge($params, $filterIds);
 }
 
@@ -53,7 +56,7 @@ if ($search !== '') {
     $params[] = "%$search%";
 }
 
-$sql .= " ORDER BY t.full_name";
+$sql .= " GROUP BY t.id ORDER BY t.full_name";
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $teachers = $stmt->fetchAll();
@@ -118,7 +121,7 @@ $teachers = $stmt->fetchAll();
     background: linear-gradient(135deg, #1A1A1A, #E30613);
 }
 .teacher-photo.no-photo::before { display: none; }
-.teacher-photo.no-photo i {
+.teacher-photo.no-photo i.fa-user-tie {
     position: relative;
     z-index: 1;
     font-size: 4rem;
@@ -126,14 +129,21 @@ $teachers = $stmt->fetchAll();
     opacity: .9;
 }
 
-.teacher-cat-badge {
+/* Category badges (godak thiyenna puluwan) */
+.teacher-cats {
     position: absolute;
     top: 12px;
     left: 12px;
+    right: 12px;
     z-index: 3;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.teacher-cat-badge {
     background: rgba(26,26,26,.85);
     color: #fff;
-    font-size: .75rem;
+    font-size: .72rem;
     font-weight: 600;
     padding: 4px 12px;
     border-radius: 50px;
@@ -263,24 +273,33 @@ $teachers = $stmt->fetchAll();
                             <?php
                                 $tImg     = imageUrl('teachers', $t['photo'] ?? null);
                                 $subjects = array_filter(array_map('trim', explode(',', (string)($t['subject'] ?? ''))));
+                                $catNames = !empty($t['category_names']) ? explode('||', $t['category_names']) : [];
                             ?>
                             <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="<?php echo ($i % 3) * 80; ?>">
                                 <div class="teacher-card">
 
                                     <?php if ($tImg): ?>
                                         <div class="teacher-photo" style="--photo:url('<?php echo e($tImg); ?>')">
-                                            <?php if (!empty($t['category_name'])): ?>
-                                                <span class="teacher-cat-badge"><?php echo e($t['category_name']); ?></span>
+                                            <?php if ($catNames): ?>
+                                                <div class="teacher-cats">
+                                                    <?php foreach ($catNames as $cn): ?>
+                                                        <span class="teacher-cat-badge"><?php echo e($cn); ?></span>
+                                                    <?php endforeach; ?>
+                                                </div>
                                             <?php endif; ?>
                                             <img src="<?php echo e($tImg); ?>"
                                                  alt="<?php echo e($t['full_name']); ?>"
                                                  loading="lazy"
-                                                 onerror="this.style.display='none'; this.parentElement.classList.add('no-photo'); this.parentElement.innerHTML='<i class=\'fas fa-user-tie\'></i>';">
+                                                 onerror="this.style.display='none'; this.parentElement.classList.add('no-photo'); this.parentElement.insertAdjacentHTML('beforeend','<i class=\'fas fa-user-tie\'></i>');">
                                         </div>
                                     <?php else: ?>
                                         <div class="teacher-photo no-photo">
-                                            <?php if (!empty($t['category_name'])): ?>
-                                                <span class="teacher-cat-badge"><?php echo e($t['category_name']); ?></span>
+                                            <?php if ($catNames): ?>
+                                                <div class="teacher-cats">
+                                                    <?php foreach ($catNames as $cn): ?>
+                                                        <span class="teacher-cat-badge"><?php echo e($cn); ?></span>
+                                                    <?php endforeach; ?>
+                                                </div>
                                             <?php endif; ?>
                                             <i class="fas fa-user-tie"></i>
                                         </div>
