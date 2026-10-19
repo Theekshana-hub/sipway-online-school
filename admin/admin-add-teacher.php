@@ -3,10 +3,18 @@ require_once __DIR__.'/includes/admin-auth.php';
 $pdo = getDB();
 $error = '';
 
-// Category list (dropdown ekata)
-$categories = $pdo->query("SELECT id, name FROM categories ORDER BY name")->fetchAll();
+// ===== Categories tree (parent + sub) =====
+$allCats = $pdo->query("SELECT id, name, parent_id FROM categories ORDER BY sort_order, name")->fetchAll();
+$topCats = [];
+$subCats = [];
+foreach ($allCats as $ct) {
+    if (empty($ct['parent_id'])) $topCats[] = $ct;
+    else $subCats[$ct['parent_id']][] = $ct;
+}
+$validIds = array_map('intval', array_column($allCats, 'id'));
 
 $postedSubjects = [''];
+$postedCats = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name  = trim($_POST['full_name'] ?? '');
@@ -14,10 +22,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $phone = trim($_POST['phone'] ?? '');
     $bio   = trim($_POST['bio'] ?? '');
 
-    // Category (optional) - valid id ekakda balanawa
-    $categoryId = (int)($_POST['category_id'] ?? 0);
-    $validIds = array_map('intval', array_column($categories, 'id'));
-    if (!in_array($categoryId, $validIds, true)) $categoryId = null;
+    // Selected categories (godak) - valid ewa withrak ganna
+    $rawCats = $_POST['category_ids'] ?? [];
+    if (!is_array($rawCats)) $rawCats = [$rawCats];
+    $postedCats = array_values(array_unique(array_filter(
+        array_map('intval', $rawCats),
+        function ($v) use ($validIds) { return in_array($v, $validIds, true); }
+    )));
 
     $rawSubjects = $_POST['subject'] ?? [];
     if (!is_array($rawSubjects)) $rawSubjects = [$rawSubjects];
@@ -39,15 +50,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($photo === false) $error = 'Image upload failed. Use JPG/PNG/WebP under 5MB.';
         else {
             if (!$photo) $photo = 'default-teacher.jpg';
-            $pdo->prepare("INSERT INTO teachers (full_name,email,phone,subject,category_id,bio,photo) VALUES (?,?,?,?,?,?,?)")
-                ->execute([$name,$email,$phone,$subject,$categoryId,$bio,$photo]);
-            redirect('admin-teachers.php?msg=added');
+
+            $pdo->beginTransaction();
+            try {
+                $pdo->prepare("INSERT INTO teachers (full_name,email,phone,subject,bio,photo) VALUES (?,?,?,?,?,?)")
+                    ->execute([$name,$email,$phone,$subject,$bio,$photo]);
+                $teacherId = (int)$pdo->lastInsertId();
+
+                if ($postedCats) {
+                    $ins = $pdo->prepare("INSERT IGNORE INTO teacher_categories (teacher_id, category_id) VALUES (?, ?)");
+                    foreach ($postedCats as $cid) {
+                        $ins->execute([$teacherId, $cid]);
+                    }
+                }
+                $pdo->commit();
+            } catch (Exception $ex) {
+                $pdo->rollBack();
+                $error = 'Save failed: ' . $ex->getMessage();
+            }
+
+            if (!$error) redirect('admin-teachers.php?msg=added');
         }
     }
 }
 $page_title = 'Add Teacher';
 require_once 'includes/admin-header.php';
 ?>
+<style>
+.cat-box { max-height: 220px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 8px; padding: 10px 14px; background: #fff; }
+.cat-parent { font-weight: 600; }
+.cat-sub { padding-left: 24px; }
+</style>
+
 <?php if ($error): ?><div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div><?php endif; ?>
 <div class="table-card"><div class="card-header">Add Teacher</div><div class="p-4">
 <form method="POST" enctype="multipart/form-data"><div class="row g-3">
@@ -59,16 +93,32 @@ require_once 'includes/admin-header.php';
 </div>
 
 <div class="col-md-6">
-    <label class="form-label">Category</label>
-    <select name="category_id" class="form-select">
-        <option value="">-- Select Category --</option>
-        <?php foreach ($categories as $c): ?>
-        <option value="<?php echo (int)$c['id']; ?>"
-            <?php echo ((int)($_POST['category_id'] ?? 0) === (int)$c['id']) ? 'selected' : ''; ?>>
-            <?php echo htmlspecialchars($c['name']); ?>
-        </option>
+    <label class="form-label">Categories <small class="text-muted">(godak select karanna puluwan)</small></label>
+    <div class="cat-box">
+        <?php if (!$topCats): ?>
+            <small class="text-muted">No categories found.</small>
+        <?php endif; ?>
+        <?php foreach ($topCats as $cat): ?>
+            <div class="form-check cat-parent">
+                <input class="form-check-input" type="checkbox" name="category_ids[]"
+                       id="cat<?php echo (int)$cat['id']; ?>" value="<?php echo (int)$cat['id']; ?>"
+                       <?php echo in_array((int)$cat['id'], $postedCats, true) ? 'checked' : ''; ?>>
+                <label class="form-check-label" for="cat<?php echo (int)$cat['id']; ?>">
+                    <?php echo htmlspecialchars($cat['name']); ?>
+                </label>
+            </div>
+            <?php foreach ($subCats[$cat['id']] ?? [] as $sub): ?>
+                <div class="form-check cat-sub">
+                    <input class="form-check-input" type="checkbox" name="category_ids[]"
+                           id="cat<?php echo (int)$sub['id']; ?>" value="<?php echo (int)$sub['id']; ?>"
+                           <?php echo in_array((int)$sub['id'], $postedCats, true) ? 'checked' : ''; ?>>
+                    <label class="form-check-label" for="cat<?php echo (int)$sub['id']; ?>">
+                        <?php echo htmlspecialchars($sub['name']); ?>
+                    </label>
+                </div>
+            <?php endforeach; ?>
         <?php endforeach; ?>
-    </select>
+    </div>
 </div>
 
 <div class="col-md-6">
