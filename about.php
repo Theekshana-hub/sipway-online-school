@@ -8,7 +8,7 @@
 <p class="lead">Sipway Online School brings quality education online — A/L classes, Technology, Commerce, Languages and more.</p>
 <p>We are committed to delivering practical, career-oriented education. Our online platform makes learning accessible to students across Sri Lanka.</p>
 <div class="row g-3 mt-2">
-<?php foreach (['A/L All Streams','Expert Teachers','Flexible Online','Certificates'] as $item): ?>
+<?php foreach (['A/L All Streams','Expert Teachers','Flexible Online',] as $item): ?>
 <div class="col-6"><div class="d-flex align-items-center gap-2"><i class="fas fa-check-circle" style="color:#E30613"></i><span><?php echo $item; ?></span></div></div>
 <?php endforeach; ?>
 </div></div>
@@ -17,7 +17,35 @@
 <i class="fas fa-graduation-cap" style="font-size:7rem;color:rgba(255,255,255,.25)"></i>
 </div></div></div></div></section>
 <section class="section bg-light"><div class="container"><div class="row g-4">
-<div class="col-md-6" data-aos="fade-up"><div class="lesson-content h-100"><h3><i class="fas fa-eye me-2" style="color:#E30613"></i>Our Vision</h3><p>To be a nationally recognised professional higher education institution known for inclusiveness, innovation and exceptional student success.</p></div></div>
-<div class="col-md-6" data-aos="fade-up" data-aos-delay="100"><div class="lesson-content h-100"><h3><i class="fas fa-bullseye me-2" style="color:#E30613"></i>Our Mission</h3><p>We offer high-quality, industry-aligned education that empowers learners to achieve academic excellence and lifelong success.</p></div></div>
+
+<div class="col-md-6" data-aos="fade-up">
+    <div class="lesson-content h-100">
+        <h3>
+            <i class="fas fa-eye me-2" style="color:#E30613"></i>
+            Our Vision
+        </h3>
+        <p>
+            To become a leading online education platform in Sri Lanka,
+            inspiring students through quality education, innovation,
+            and equal learning opportunities for a brighter future.
+        </p>
+    </div>
+</div>
+
+<div class="col-md-6" data-aos="fade-up" data-aos-delay="100">
+    <div class="lesson-content h-100">
+        <h3>
+            <i class="fas fa-bullseye me-2" style="color:#E30613"></i>
+            Our Mission
+        </h3>
+        <p>
+            To provide accessible, engaging, and high-quality education
+            through experienced teachers, innovative learning methods,
+            and a supportive environment that empowers every student
+            to achieve academic excellence and lifelong success.
+        </p>
+    </div>
+</div>
+
 </div></div></section>
 <?php require_once 'includes/footer.php'; ?>

@@ -17,7 +17,7 @@ $total_students = $pdo->query("SELECT COUNT(*) FROM users WHERE role='student'")
                     <i class="fas fa-star"></i> Sipway Campus Official Online Platform
                 </div>
                 <h1>Learn Differently.<br><span>Succeed Differently.</span></h1>
-                <p>A/L Classes • Technology • Commerce • Korean Language • Grade 6-7 • Astrology. Quality online education from Sipway Campus, Kurunegala.</p>
+                <p>Empowering Students Through Quality Education, Expert Guidance, and Innovative Learning Experiences. Discover Your Potential and Build a Brighter Future with Sipway Online School, Kurunegala.</p>
                 <div class="hero-buttons">
                     <a href="courses.php" class="btn btn-primary btn-lg">
                         <i class="fas fa-book-open me-2"></i>Explore Courses
