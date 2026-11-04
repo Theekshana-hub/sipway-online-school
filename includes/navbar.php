@@ -2,7 +2,7 @@
   <div class="container">
     <a class="navbar-brand d-flex align-items-center" href="<?php echo SITE_URL; ?>/index.php">
       <img src="<?php echo SITE_URL; ?>/logo.png" alt="SIPWAY Logo" class="brand-logo me-2" style="height: 50px; width: auto;">
-      <span class="brand-text">SIPWAY<span>online school</span></span>
+      <span class="brand-text">SIPWAY<span>Online School</span></span>
     </a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
       <span class="navbar-toggler-icon"></span>
