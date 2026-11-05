@@ -6,10 +6,40 @@ $featured = $pdo->query("SELECT c.*, cat.name as cat_name, cat.icon as cat_icon,
 $categories = $pdo->query("SELECT * FROM categories ORDER BY sort_order, name")->fetchAll();
 $total_courses = $pdo->query("SELECT COUNT(*) FROM courses WHERE is_published=1")->fetchColumn();
 $total_students = $pdo->query("SELECT COUNT(*) FROM users WHERE role='student'")->fetchColumn();
+
+// ---- Hero background slideshow images (assets/images/hero/) ----
+$heroSlides = [];
+$heroDir = __DIR__ . '/assets/images/hero/';
+if (is_dir($heroDir)) {
+    $heroFiles = glob($heroDir . '*.{jpg,jpeg,png,webp,JPG,JPEG,PNG,WEBP}', GLOB_BRACE);
+    if ($heroFiles) {
+        natsort($heroFiles);
+        foreach ($heroFiles as $hf) {
+            $heroSlides[] = 'assets/images/hero/' . rawurlencode(basename($hf));
+        }
+    }
+}
 ?>
 
 
 <section class="hero">
+
+    <?php if (!empty($heroSlides)): ?>
+    <div class="hero-bg-slider" id="heroBgSlider">
+        <?php foreach ($heroSlides as $i => $src): ?>
+            <div class="hero-bg-slide<?php echo $i === 0 ? ' active' : ''; ?>" style="background-image: url('<?php echo e($src); ?>');"></div>
+        <?php endforeach; ?>
+    </div>
+    <div class="hero-bg-overlay"></div>
+    <?php if (count($heroSlides) > 1): ?>
+    <div class="hero-bg-dots" id="heroBgDots">
+        <?php foreach ($heroSlides as $i => $src): ?>
+            <button type="button" aria-label="Slide <?php echo $i + 1; ?>" class="<?php echo $i === 0 ? 'active' : ''; ?>"></button>
+        <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
+    <?php endif; ?>
+
     <div class="container">
         <div class="row align-items-center">
             <div class="col-lg-7 hero-content">
@@ -58,6 +88,43 @@ $total_students = $pdo->query("SELECT COUNT(*) FROM users WHERE role='student'")
         <svg viewBox="0 0 1440 80" preserveAspectRatio="none"><path fill="#f8f9fa" d="M0,40 C360,80 720,0 1440,40 L1440,80 L0,80 Z"></path></svg>
     </div>
 </section>
+
+<?php if (!empty($heroSlides) && count($heroSlides) > 1): ?>
+<script>
+(function () {
+    var slides = document.querySelectorAll('#heroBgSlider .hero-bg-slide');
+    var dots   = document.querySelectorAll('#heroBgDots button');
+    var current = 0, timer = null, DELAY = 5500;
+
+    // Preload all images so transitions are smooth
+    slides.forEach(function (s) {
+        var m = s.style.backgroundImage.match(/url\(["']?(.*?)["']?\)/);
+        if (m) { var img = new Image(); img.src = m[1]; }
+    });
+
+    function show(n) {
+        slides[current].classList.remove('active');
+        if (dots[current]) dots[current].classList.remove('active');
+        current = (n + slides.length) % slides.length;
+        void slides[current].offsetWidth; // restart Ken Burns animation
+        slides[current].classList.add('active');
+        if (dots[current]) dots[current].classList.add('active');
+    }
+    function start() { stop(); timer = setInterval(function () { show(current + 1); }, DELAY); }
+    function stop()  { if (timer) clearInterval(timer); }
+
+    dots.forEach(function (d, i) {
+        d.addEventListener('click', function () { show(i); start(); });
+    });
+
+    document.addEventListener('visibilitychange', function () {
+        document.hidden ? stop() : start();
+    });
+
+    start();
+})();
+</script>
+<?php endif; ?>
 
 <section class="section bg-light">
     <div class="container">
@@ -280,9 +347,81 @@ $total_students = $pdo->query("SELECT COUNT(*) FROM users WHERE role='student'")
     left: 0;
     width: 100%;
     line-height: 0;
+    z-index: 3;
 }
 .hero-wave svg { width: 100%; height: 50px; display: block; }
 .hero { padding-bottom: 50px; }
+
+/* ===== Hero background slideshow ===== */
+.hero {
+    position: relative;
+    overflow: hidden;
+}
+.hero > .container {
+    position: relative;
+    z-index: 3;
+}
+.hero-bg-slider {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+}
+.hero-bg-slide {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    opacity: 0;
+    transform: scale(1);
+    transition: opacity 1.6s ease-in-out;
+    will-change: opacity, transform;
+}
+.hero-bg-slide.active {
+    opacity: 1;
+    animation: heroKenBurns 9s ease-out forwards;
+}
+@keyframes heroKenBurns {
+    from { transform: scale(1); }
+    to   { transform: scale(1.12); }
+}
+/* Dark overlay: images poddak penna, text clear */
+.hero-bg-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background:
+        linear-gradient(90deg, rgba(8,8,8,0.88) 0%, rgba(8,8,8,0.68) 50%, rgba(8,8,8,0.50) 100%),
+        linear-gradient(180deg, rgba(227,6,19,0.10) 0%, rgba(0,0,0,0.35) 100%);
+}
+.hero-bg-dots {
+    position: absolute;
+    left: 50%;
+    bottom: 62px;
+    transform: translateX(-50%);
+    z-index: 4;
+    display: flex;
+    gap: 8px;
+}
+.hero-bg-dots button {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    border: 0;
+    padding: 0;
+    background: rgba(255,255,255,0.35);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+.hero-bg-dots button.active {
+    width: 26px;
+    border-radius: 10px;
+    background: #E30613;
+}
+@media (prefers-reduced-motion: reduce) {
+    .hero-bg-slide.active { animation: none; }
+    .hero-bg-slide { transition: none; }
+}
 
 .subject-chip {
     background: #fff;
