@@ -3,7 +3,7 @@ require_once 'includes/db.php';
 require_once 'includes/functions.php';
 
 if (isAdmin()) redirect('admin/admin-dashboard.php');
-// Clear student session if any
+
 if (isLoggedIn() && !isAdmin()) { session_destroy(); session_start(); }
 
 $error = '';
