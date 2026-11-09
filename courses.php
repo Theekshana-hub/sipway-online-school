@@ -126,12 +126,9 @@ foreach ($topCats as $t) {
 .cg-grid .course-card:hover .cg-img{
     transform:scale(1.06);
 }
-.cg-thumb .course-badge,
-.cg-thumb .course-level{ 
+.cg-thumb .course-badge{ 
     z-index:2; 
     position:absolute;
-}
-.cg-thumb .course-badge{
     top:12px; left:12px;
     background:#E30613;
     color:#fff;
@@ -139,14 +136,6 @@ foreach ($topCats as $t) {
     font-weight:700;
     padding:5px 12px;
     border-radius:999px;
-}
-.cg-thumb .course-level{
-    bottom:12px; right:12px;
-    background:rgba(0,0,0,.65);
-    color:#fff;
-    font-size:12px;
-    padding:4px 10px;
-    border-radius:6px;
 }
 .cg-grid .course-body{
     flex:1;
@@ -345,7 +334,6 @@ foreach ($topCats as $t) {
                                         <?php if ($c['is_featured']): ?>
                                             <span class="course-badge">Featured</span>
                                         <?php endif; ?>
-                                        <span class="course-level"><?php echo e($c['level']); ?></span>
                                     </div>
                                 <?php else: ?>
                                     <div class="course-thumb cg-thumb" 
@@ -354,7 +342,6 @@ foreach ($topCats as $t) {
                                         <?php if ($c['is_featured']): ?>
                                             <span class="course-badge">Featured</span>
                                         <?php endif; ?>
-                                        <span class="course-level"><?php echo e($c['level']); ?></span>
                                     </div>
                                 <?php endif; ?>
 
