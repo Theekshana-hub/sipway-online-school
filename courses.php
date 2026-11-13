@@ -7,7 +7,6 @@ if (session_status() === PHP_SESSION_NONE) session_start();
 $cat_slug = $_GET['cat'] ?? '';
 $search   = trim($_GET['q'] ?? '');
 
-// ===== Column තියෙනවද කියලා check කරන function =====
 function hasColumn(PDO $pdo, string $table, string $column): bool {
     try {
         $stmt = $pdo->query("SHOW COLUMNS FROM `$table` LIKE " . $pdo->quote($column));
@@ -17,7 +16,6 @@ function hasColumn(PDO $pdo, string $table, string $column): bool {
     }
 }
 
-// Teacher column එක හොයාගන්න
 $teacherColumn = null;
 $possibleColumns = ['teacher_id', 'instructor_id', 'lecturer_id', 'teacher', 'user_id'];
 foreach ($possibleColumns as $col) {
@@ -27,7 +25,6 @@ foreach ($possibleColumns as $col) {
     }
 }
 
-// ===== Courses query =====
 $sql = "SELECT c.*, 
                cat.name AS cat_name, cat.slug AS cat_slug, cat.icon AS cat_icon, cat.color AS cat_color,
                par.name AS parent_name";
@@ -65,7 +62,27 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $courses = $stmt->fetchAll();
 
-// Paid courses
+/* ---------- Load schedules ---------- */
+$schedulesByCourse = [];
+if (!empty($courses)) {
+    try {
+        $ids = array_map(fn($r) => (int)$r['id'], $courses);
+        $ph  = implode(',', array_fill(0, count($ids), '?'));
+        $ss  = $pdo->prepare("SELECT * FROM course_year_schedules WHERE course_id IN ($ph) ORDER BY sort_order, id");
+        $ss->execute($ids);
+        foreach ($ss->fetchAll() as $row) {
+            $schedulesByCourse[(int)$row['course_id']][] = $row;
+        }
+    } catch (Exception $ex) {
+        $schedulesByCourse = [];
+    }
+}
+
+function clTime($t) {
+    return $t ? date('g:i A', strtotime($t)) : '';
+}
+
+/* Paid courses */
 $paidCourseIds = [];
 if (!empty($_SESSION['user_id'])) {
     $ps = $pdo->prepare("SELECT course_id FROM course_orders WHERE user_id = ? AND status = 'paid'");
@@ -73,7 +90,7 @@ if (!empty($_SESSION['user_id'])) {
     $paidCourseIds = array_map('intval', $ps->fetchAll(PDO::FETCH_COLUMN));
 }
 
-// Categories tree
+/* Categories tree */
 $allCats = $pdo->query("SELECT * FROM categories ORDER BY sort_order, name")->fetchAll();
 $topCats = [];
 $subCats = [];
@@ -88,10 +105,11 @@ foreach ($topCats as $t) {
     }
 }
 ?>
+
 <style>
 .cg-grid{
     display:grid;
-    grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+    grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
     gap:24px;
 }
 .cg-grid .cg-item{ min-width:0; }
@@ -123,9 +141,7 @@ foreach ($topCats as $t) {
     display:block;
     transition:transform .5s;
 }
-.cg-grid .course-card:hover .cg-img{
-    transform:scale(1.06);
-}
+.cg-grid .course-card:hover .cg-img{ transform:scale(1.06); }
 .cg-thumb .course-badge{ 
     z-index:2; 
     position:absolute;
@@ -169,7 +185,7 @@ foreach ($topCats as $t) {
     overflow:hidden;
 }
 
-/* Teacher mini info */
+/* Teacher */
 .course-teacher {
     display:flex;
     align-items:center;
@@ -208,6 +224,40 @@ foreach ($topCats as $t) {
     text-overflow:ellipsis;
 }
 
+/* Schedule chips */
+.cl-schedule { display:flex; flex-direction:column; gap:6px; margin:10px 0 6px; }
+.cl-slot {
+    display:flex; flex-wrap:wrap; align-items:center; gap:5px;
+    background:#f6f7f9; border:1px solid #e9eaee; border-radius:10px;
+    padding:6px 8px;
+}
+.cl-chip {
+    display:inline-flex; align-items:center; gap:4px;
+    background:#fff; color:#16181d; border-radius:7px;
+    padding:3px 7px; font-size:11.5px; font-weight:600;
+    border:1px solid #e9eaee; line-height:1.3;
+}
+.cl-chip i { color:#E30613; font-size:10px; }
+.cl-chip.year { background:#E30613; color:#fff; border-color:#E30613; }
+.cl-chip.year i { color:#fff; }
+.cl-chip.fee { background:#ecfdf3; color:#15803d; border-color:#bbf7d0; margin-left:auto; font-weight:700; }
+.cl-chip.fee i { color:#15803d; }
+
+.cl-extra-slots { display:none; flex-direction:column; gap:6px; }
+.cl-extra-slots.open { display:flex; animation:clDrop .22s ease; }
+@keyframes clDrop { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:none; } }
+
+.cl-more-btn {
+    display:inline-flex; align-items:center; gap:6px;
+    margin-top:4px; padding:4px 2px;
+    background:none; border:none; color:#E30613;
+    font-size:12.5px; font-weight:600; cursor:pointer;
+    font-family:inherit;
+}
+.cl-more-btn:hover { text-decoration:underline; }
+.cl-more-btn i { font-size:11px; transition:transform .2s; }
+.cl-more-btn[aria-expanded="true"] i { transform:rotate(180deg); }
+
 .course-meta{
     display:flex;
     justify-content:space-between;
@@ -218,10 +268,7 @@ foreach ($topCats as $t) {
     padding-top:12px;
     margin-top:auto;
 }
-.course-price{
-    font-weight:700;
-    color:#111;
-}
+.course-price{ font-weight:700; color:#111; }
 .cg-actions{ display:flex; gap:8px; margin-top:14px; }
 .cg-actions .btn{ flex:1; font-size:.85rem; padding:.5rem .5rem; border-radius:8px; }
 
@@ -297,7 +344,7 @@ foreach ($topCats as $t) {
             </div>
 
             <div class="col-lg-9">
-                <p class="text-muted mb-3" data-aos="fade-up"><?php echo count($courses); ?> classe(s) found</p>
+                <p class="text-muted mb-3" data-aos="fade-up"><?php echo count($courses); ?> class(es) found</p>
 
                 <?php if (empty($courses)): ?>
                     <div class="text-center py-5">
@@ -312,6 +359,13 @@ foreach ($topCats as $t) {
                             $teacherImg  = !empty($c['teacher_photo']) ? imageUrl('teachers', $c['teacher_photo']) : null;
                             $teacherName = $c['teacher_name'] ?? '';
                             $isPaid      = in_array((int)$c['id'], $paidCourseIds, true);
+                            $classSchedules = $schedulesByCourse[(int)$c['id']] ?? [];
+
+                            $maxVisible = 3;
+                            $visibleSchedules = array_slice($classSchedules, 0, $maxVisible);
+                            $extraSchedules   = array_slice($classSchedules, $maxVisible);
+                            $extraCount       = count($extraSchedules);
+                            $cardId           = 'cl-sched-' . (int)$c['id'];
                         ?>
                         <div class="cg-item" data-aos="fade-up" data-aos-delay="<?php echo ($i % 3) * 70; ?>">
                             <div class="course-card">
@@ -360,7 +414,67 @@ foreach ($topCats as $t) {
                                     <?php endif; ?>
 
                                     <p class="course-desc"><?php echo e($c['short_desc']); ?></p>
-                                    
+
+                                    <!-- Schedules -->
+                                    <?php if (!empty($classSchedules)): ?>
+                                        <div class="cl-schedule">
+                                            <?php foreach ($visibleSchedules as $sc):
+                                                $t = clTime($sc['start_time']);
+                                                if ($t && !empty($sc['end_time'])) $t .= ' – ' . clTime($sc['end_time']);
+                                                $slotFee = ($sc['fee'] !== null && $sc['fee'] !== '') ? (float)$sc['fee'] : null;
+                                            ?>
+                                                <div class="cl-slot">
+                                                    <?php if (!empty($sc['class_year'])): ?>
+                                                        <span class="cl-chip year"><i class="fas fa-graduation-cap"></i> <?php echo e($sc['class_year']); ?></span>
+                                                    <?php endif; ?>
+                                                    <?php if (!empty($sc['class_day'])): ?>
+                                                        <span class="cl-chip"><i class="far fa-calendar"></i> <?php echo e($sc['class_day']); ?></span>
+                                                    <?php endif; ?>
+                                                    <?php if ($t): ?>
+                                                        <span class="cl-chip"><i class="far fa-clock"></i> <?php echo e($t); ?></span>
+                                                    <?php endif; ?>
+                                                    <?php if ($slotFee !== null): ?>
+                                                        <span class="cl-chip fee"><i class="fas fa-tag"></i> <?php echo $slotFee > 0 ? 'Rs. ' . number_format($slotFee) : 'Free'; ?></span>
+                                                    <?php endif; ?>
+                                                </div>
+                                            <?php endforeach; ?>
+
+                                            <?php if ($extraCount > 0): ?>
+                                                <div class="cl-extra-slots" id="<?php echo $cardId; ?>">
+                                                    <?php foreach ($extraSchedules as $sc):
+                                                        $t = clTime($sc['start_time']);
+                                                        if ($t && !empty($sc['end_time'])) $t .= ' – ' . clTime($sc['end_time']);
+                                                        $slotFee = ($sc['fee'] !== null && $sc['fee'] !== '') ? (float)$sc['fee'] : null;
+                                                    ?>
+                                                        <div class="cl-slot">
+                                                            <?php if (!empty($sc['class_year'])): ?>
+                                                                <span class="cl-chip year"><i class="fas fa-graduation-cap"></i> <?php echo e($sc['class_year']); ?></span>
+                                                            <?php endif; ?>
+                                                            <?php if (!empty($sc['class_day'])): ?>
+                                                                <span class="cl-chip"><i class="far fa-calendar"></i> <?php echo e($sc['class_day']); ?></span>
+                                                            <?php endif; ?>
+                                                            <?php if ($t): ?>
+                                                                <span class="cl-chip"><i class="far fa-clock"></i> <?php echo e($t); ?></span>
+                                                            <?php endif; ?>
+                                                            <?php if ($slotFee !== null): ?>
+                                                                <span class="cl-chip fee"><i class="fas fa-tag"></i> <?php echo $slotFee > 0 ? 'Rs. ' . number_format($slotFee) : 'Free'; ?></span>
+                                                            <?php endif; ?>
+                                                        </div>
+                                                    <?php endforeach; ?>
+                                                </div>
+
+                                                <button type="button" class="cl-more-btn"
+                                                        aria-expanded="false"
+                                                        aria-controls="<?php echo $cardId; ?>"
+                                                        data-more="+<?php echo $extraCount; ?> more schedule<?php echo $extraCount > 1 ? 's' : ''; ?>"
+                                                        data-less="Show less">
+                                                    <span class="cl-more-text">+<?php echo $extraCount; ?> more schedule<?php echo $extraCount > 1 ? 's' : ''; ?></span>
+                                                    <i class="fas fa-chevron-down"></i>
+                                                </button>
+                                            <?php endif; ?>
+                                        </div>
+                                    <?php endif; ?>
+
                                     <div class="course-meta">
                                         <span><i class="far fa-clock"></i> <?php echo e($c['duration']); ?></span>
                                         <span class="course-price"><?php echo formatPrice($c['price']); ?></span>
@@ -387,5 +501,30 @@ foreach ($topCats as $t) {
         </div>
     </div>
 </section>
+
+<script>
+(function () {
+    document.querySelectorAll('.cl-more-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var targetId = btn.getAttribute('aria-controls');
+            var box = document.getElementById(targetId);
+            if (!box) return;
+
+            var isOpen = btn.getAttribute('aria-expanded') === 'true';
+            var textEl = btn.querySelector('.cl-more-text');
+
+            if (isOpen) {
+                box.classList.remove('open');
+                btn.setAttribute('aria-expanded', 'false');
+                if (textEl) textEl.textContent = btn.getAttribute('data-more');
+            } else {
+                box.classList.add('open');
+                btn.setAttribute('aria-expanded', 'true');
+                if (textEl) textEl.textContent = btn.getAttribute('data-less');
+            }
+        });
+    });
+})();
+</script>
 
 <?php require_once 'includes/footer.php'; ?>
