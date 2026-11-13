@@ -297,19 +297,6 @@ foreach ($topCats as $t) {
             </div>
 
             <div class="col-lg-9">
-                <!-- Debug info (පස්සේ ඉවත් කරන්න) -->
-                <?php if (!$teacherColumn): ?>
-                    <div class="alert alert-warning mb-3">
-                        <strong>⚠ Teacher column හමු නොවුණා!</strong><br>
-                        <code>courses</code> table එකේ teacher ආශ්‍රිත column එකක් නැහැ. 
-                        Database එකේ <code>courses</code> table එකේ columns මොනවද කියලා check කරන්න.
-                    </div>
-                <?php else: ?>
-                    <div class="alert alert-info mb-3">
-                        Teacher column හමු වුණා: <strong><?php echo e($teacherColumn); ?></strong>
-                    </div>
-                <?php endif; ?>
-
                 <p class="text-muted mb-3" data-aos="fade-up"><?php echo count($courses); ?> classe(s) found</p>
 
                 <?php if (empty($courses)): ?>
