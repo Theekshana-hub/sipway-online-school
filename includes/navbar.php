@@ -1,44 +1,78 @@
 <nav class="navbar navbar-expand-lg fixed-top" id="mainNav">
   <div class="container">
+    <!-- Brand -->
     <a class="navbar-brand d-flex align-items-center" href="<?php echo SITE_URL; ?>/index.php">
-      <img src="<?php echo SITE_URL; ?>/logo.png" alt="SIPWAY Logo" class="brand-logo me-2" style="height: 50px; width: auto;">
-      <span class="brand-text">SIPWAY<span>Online School</span></span>
+      <img src="<?php echo SITE_URL; ?>/logo.png" 
+           alt="SIPWAY Logo" 
+           class="brand-logo me-2" 
+           style="height: 45px; width: auto;">
+      <span class="brand-text">
+        SIPWAY
+        <span class="d-none d-sm-inline">Online School</span>
+      </span>
     </a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+
+    <!-- Mobile Toggle Button -->
+    <button class="navbar-toggler" 
+            type="button" 
+            data-bs-toggle="collapse" 
+            data-bs-target="#navbarNav" 
+            aria-controls="navbarNav" 
+            aria-expanded="false" 
+            aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
     </button>
+
+    <!-- Menu -->
     <div class="collapse navbar-collapse" id="navbarNav">
       <ul class="navbar-nav ms-auto align-items-lg-center">
+        
         <li class="nav-item">
-          <a class="nav-link <?php echo $current_page=='index'?'active':''; ?>" href="<?php echo SITE_URL; ?>/index.php">Home</a>
+          <a class="nav-link <?php echo $current_page == 'index' ? 'active' : ''; ?>" 
+             href="<?php echo SITE_URL; ?>/index.php">Home</a>
         </li>
+
         <li class="nav-item">
-          <a class="nav-link <?php echo $current_page=='courses'||$current_page=='course-details'?'active':''; ?>" href="<?php echo SITE_URL; ?>/courses.php">Classes</a>
+          <a class="nav-link <?php echo ($current_page == 'courses' || $current_page == 'course-details') ? 'active' : ''; ?>" 
+             href="<?php echo SITE_URL; ?>/courses.php">Classes</a>
         </li>
+
         <li class="nav-item">
-          <a class="nav-link <?php echo $current_page=='teachers'?'active':''; ?>" href="<?php echo SITE_URL; ?>/teachers.php">Teachers</a>
+          <a class="nav-link <?php echo $current_page == 'teachers' ? 'active' : ''; ?>" 
+             href="<?php echo SITE_URL; ?>/teachers.php">Teachers</a>
         </li>
+
         <li class="nav-item">
-          <a class="nav-link <?php echo $current_page=='about'?'active':''; ?>" href="<?php echo SITE_URL; ?>/about.php">About</a>
+          <a class="nav-link <?php echo $current_page == 'about' ? 'active' : ''; ?>" 
+             href="<?php echo SITE_URL; ?>/about.php">About</a>
         </li>
+
         <li class="nav-item">
-          <a class="nav-link <?php echo $current_page=='contact'?'active':''; ?>" href="<?php echo SITE_URL; ?>/contact.php">Contact</a>
+          <a class="nav-link <?php echo $current_page == 'contact' ? 'active' : ''; ?>" 
+             href="<?php echo SITE_URL; ?>/contact.php">Contact</a>
         </li>
+
         <?php if (isLoggedIn()): ?>
+          <!-- Logged in user dropdown -->
           <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+            <a class="nav-link dropdown-toggle" 
+               href="#" 
+               id="userDropdown" 
+               role="button" 
+               data-bs-toggle="dropdown" 
+               aria-expanded="false">
               <i class="fas fa-user-circle me-1"></i>
               <?php echo e($_SESSION['full_name'] ?? 'Account'); ?>
             </a>
-            <ul class="dropdown-menu dropdown-menu-end">
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
               <?php if (isStudent()): ?>
                 <li>
                   <a class="dropdown-item" href="<?php echo SITE_URL; ?>/student-dashboard.php">
                     <i class="fas fa-book-open me-2"></i>My Learning
                   </a>
                 </li>
+                <li><hr class="dropdown-divider"></li>
               <?php endif; ?>
-              <li><hr class="dropdown-divider"></li>
               <li>
                 <a class="dropdown-item" href="<?php echo SITE_URL; ?>/logout.php">
                   <i class="fas fa-sign-out-alt me-2"></i>Logout
@@ -47,13 +81,17 @@
             </ul>
           </li>
         <?php else: ?>
-          <li class="nav-item ms-lg-2">
-            <a class="btn btn-outline-primary btn-sm px-3" href="<?php echo SITE_URL; ?>/login.php">Login</a>
+          <!-- Login / Register buttons -->
+          <li class="nav-item ms-lg-2 mt-2 mt-lg-0">
+            <a class="btn btn-outline-primary btn-sm px-3 w-100 w-lg-auto" 
+               href="<?php echo SITE_URL; ?>/login.php">Login</a>
           </li>
           <li class="nav-item ms-lg-2 mt-2 mt-lg-0">
-            <a class="btn btn-primary btn-sm px-3" href="<?php echo SITE_URL; ?>/register.php">Register</a>
+            <a class="btn btn-primary btn-sm px-3 w-100 w-lg-auto" 
+               href="<?php echo SITE_URL; ?>/register.php">Register</a>
           </li>
         <?php endif; ?>
+
       </ul>
     </div>
   </div>
