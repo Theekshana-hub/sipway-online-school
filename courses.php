@@ -481,7 +481,7 @@ foreach ($topCats as $t) {
                                     </div>
 
                                     <div class="cg-actions">
-                                        <a href="course-details.php?slug=<?php echo e($c['slug']); ?>" class="btn btn-outline-secondary">Details</a>
+                                       
                                         <?php if ($isPaid): ?>
                                             <span class="btn btn-success disabled"><i class="fas fa-check me-1"></i>Enrolled</span>
                                         <?php else: ?>
